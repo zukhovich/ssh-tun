@@ -2,14 +2,19 @@ package utils
 
 import "testing"
 
-func TestReadPasswordFromTerminal(t *testing.T) {
-	t.Skip("此测试需要人工交互，默认跳过")
-
-	password, err := ReadPasswordFromTerminal("请输入测试密码：")
+func TestGetSSHPasswordFromConfig(t *testing.T) {
+	password, err := GetSSHPassword("secret", true, "user", "example.com")
 	if err != nil {
-		t.Fatalf("读取密码出错：%v", err)
+		t.Fatalf("GetSSHPassword() returned an error: %v", err)
 	}
-	if password == "" {
-		t.Error("读取的密码为空")
+	if password != "secret" {
+		t.Errorf("GetSSHPassword() = %q, want %q", password, "secret")
+	}
+}
+
+func TestGetSSHPasswordWithoutAvailableMethod(t *testing.T) {
+	_, err := GetSSHPassword("", false, "user", "example.com")
+	if err == nil {
+		t.Fatal("GetSSHPassword() did not return an error with interactive authentication disabled")
 	}
 }

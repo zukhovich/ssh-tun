@@ -1,19 +1,21 @@
 package tun
 
 import (
+	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/Sesame2/gotun/internal/assets"
-	"github.com/Sesame2/gotun/internal/config"
-	"github.com/Sesame2/gotun/internal/logger"
-	"github.com/Sesame2/gotun/internal/proxy"
+	"github.com/zukhovich/ssh-tun/internal/config"
+	"github.com/zukhovich/ssh-tun/internal/logger"
+	"github.com/zukhovich/ssh-tun/internal/proxy"
+	"github.com/zukhovich/ssh-tun/internal/router"
 
 	"golang.zx2c4.com/wireguard/tun"
 
@@ -29,154 +31,132 @@ import (
 	"gvisor.dev/gvisor/pkg/waiter"
 )
 
-// TunService 管理 TUN 设备和用户态协议栈
+// TunService manages a TUN device and a userspace network stack.
 type TunService struct {
-	cfg      *config.Config
-	logger   *logger.Logger
-	ssh      *proxy.SSHClient
-	dev      tun.Device
-	stack    *stack.Stack
-	endpoint *channel.Endpoint
-	tunIP    string
-	tunMask  string
-	peerIP   string
-	routes   []string
-	global   bool
-
-	ifIndex int // [新增] 用于存储 Wintun 网卡的接口索引
+	cfg         *config.Config
+	logger      *logger.Logger
+	ssh         *proxy.SSHClient
+	dev         tun.Device
+	stack       *stack.Stack
+	endpoint    *channel.Endpoint
+	tunIP       string
+	prefix      int
+	peerIP      string
+	routes      []string
+	global      bool
+	router      *router.Router
+	devName     string
+	addedRoutes [][]string
+	runCommand  func(...string) ([]byte, error)
+	wg          sync.WaitGroup
 
 	closeOnce sync.Once
 }
 
-// NewTunService 创建 TUN 服务
-func NewTunService(cfg *config.Config, log *logger.Logger, sshClient *proxy.SSHClient) (*TunService, error) {
-	// 解析 CIDR
+// NewTunService creates a TUN service.
+func NewTunService(cfg *config.Config, log *logger.Logger, sshClient *proxy.SSHClient, r *router.Router) (*TunService, error) {
 	ip, ipNet, err := net.ParseCIDR(cfg.TunCIDR)
 	if err != nil {
-		return nil, fmt.Errorf("无效的 TUN CIDR: %s (%v)", cfg.TunCIDR, err)
+		return nil, fmt.Errorf("неверный TUN CIDR %s: %w", cfg.TunCIDR, err)
 	}
 	tunIP := ip.To4()
 	if tunIP == nil {
-		return nil, fmt.Errorf("只支持 IPv4 TUN 地址: %s", cfg.TunCIDR)
+		return nil, fmt.Errorf("поддерживаются только IPv4 TUN адреса: %s", cfg.TunCIDR)
 	}
 
-	// 计算 Mask
-	mask := net.IP(ipNet.Mask).String()
+	prefix, bits := ipNet.Mask.Size()
+	if bits != 32 {
+		return nil, fmt.Errorf("неверная маска IPv4 в TUN CIDR: %s", cfg.TunCIDR)
+	}
 
-	// 计算 Peer IP (简单起见，IP+1)
-	peerIP := make(net.IP, len(tunIP))
-	copy(peerIP, tunIP)
-	peerIP[3]++ // +1
+	peerIP, err := ipAdd(tunIP, 1)
+	if err != nil || !ipNet.Contains(peerIP) {
+		return nil, fmt.Errorf("не удалось выбрать адрес узла в подсети %s", cfg.TunCIDR)
+	}
 
 	return &TunService{
-		cfg:     cfg,
-		logger:  log,
-		ssh:     sshClient,
-		tunIP:   tunIP.String(),
-		tunMask: mask, // 内部仍使用 mask 字符串
-		peerIP:  peerIP.String(),
-		routes:  cfg.TunRoute,
-		global:  cfg.TunGlobal,
+		cfg:    cfg,
+		logger: log,
+		ssh:    sshClient,
+		tunIP:  tunIP.String(),
+		prefix: prefix,
+		peerIP: peerIP.String(),
+		routes: cfg.TunRoute,
+		global: cfg.TunGlobal,
+		router: r,
+		runCommand: func(args ...string) ([]byte, error) {
+			return exec.Command("ip", args...).CombinedOutput()
+		},
 	}, nil
 }
 
-// Start 启动 TUN 设备和协议栈
+// Start creates the TUN device and starts the network stack.
 func (t *TunService) Start() error {
-	// 0. (Windows Only) 释放 Wintun DLL
-	if err := assets.SetupWintun(); err != nil {
-		return fmt.Errorf("准备 Wintun 驱动失败: %v", err)
-	}
-
-	// 1. 创建 TUN 设备 (使用 wireguard-go)
-	// 在 Windows 上，这将使用 Wintun (L3)
-	// 在 macOS 上，必须使用 utun[0-9]* 格式，通常传 "utun" 会自动分配
-	devName := "gotun"
-	if runtime.GOOS == "darwin" {
-		devName = "utun"
-	}
+	devName := "ssh-tun"
 
 	dev, err := tun.CreateTUN(devName, 1500)
 	if err != nil {
-		return fmt.Errorf("创建 TUN 设备失败: %v", err)
+		return fmt.Errorf("не удалось создать TUN-устройство: %w", err)
 	}
 	t.dev = dev
+	cleanup := true
+	defer func() {
+		if cleanup {
+			_ = t.Close()
+		}
+	}()
 
 	realName, err := dev.Name()
 	if err == nil {
-		t.logger.Infof("[TUN] 设备已创建: %s", realName)
+		t.logger.Infof("[TUN] Устройство создано: %s", realName)
 	} else {
-		realName = "gotun"
+		realName = "ssh-tun"
 	}
+	t.devName = realName
 
-	// 获取网卡索引 (Windows 特有)
-	if runtime.GOOS == "windows" {
-		iface, err := net.InterfaceByName(realName)
-		if err == nil {
-			t.ifIndex = iface.Index
-		} else {
-			// 如果 CreateTUN 返回的名字和系统里的不一致，尝试模糊匹配
-			t.logger.Warnf("按名称 %s 查找接口失败，尝试遍历查找...", realName)
-			ifaces, _ := net.Interfaces()
-			for _, i := range ifaces {
-				// Wintun 驱动显示的适配器描述通常包含 WireGuard 或 Tun
-				// 但 InterfaceByName 通常匹配的是 Connection Name (如 'gotun')
-				if i.Name == realName {
-					t.ifIndex = i.Index
-					break
-				}
-			}
-		}
-
-		if t.ifIndex > 0 {
-			t.logger.Infof("[TUN] 获取到网卡索引 (IF): %d", t.ifIndex)
-		} else {
-			t.logger.Warn("[TUN] 警告: 未能获取网卡索引，路由配置可能会失败")
-		}
-	}
-
-	// 2. 配置 TUN 网卡 IP (需调用系统命令)
 	if err := t.setupTunIP(realName); err != nil {
 		dev.Close()
-		return fmt.Errorf("配置 TUN IP 失败: %v", err)
+		return fmt.Errorf("не удалось настроить IP-адрес TUN: %w", err)
 	}
 
-	// 检测路由冲突
-	t.checkRouteConflicts()
+	if err := t.checkRouteConflicts(); err != nil {
+		return err
+	}
+	if err := t.initNetstack(); err != nil {
+		return err
+	}
 
-	// 2.5 配置路由
 	if t.global {
 		if err := t.setupGlobalRoutes(realName); err != nil {
-			t.logger.Warnf("[TUN] 配置全局路由失败: %v", err)
+			return fmt.Errorf("не удалось настроить глобальные маршруты: %w", err)
 		}
 	} else if len(t.routes) > 0 {
 		if err := t.setupRoutes(realName); err != nil {
-			t.logger.Warnf("[TUN] 配置路由部分失败: %v", err)
+			return fmt.Errorf("не удалось настроить маршруты: %w", err)
 		}
 	}
 
-	// 配置别名路由 (Subnet/IP Mapping)
 	for _, sas := range t.cfg.SubnetAliases {
 		cidr := sas.Src.String()
-		t.logger.Infof("[TUN] 添加别名路由: %s -> TUN", cidr)
-		if err := t.addRoute(cidr, t.tunIP, realName); err != nil {
-			t.logger.Warnf("[TUN] 添加别名路由失败 %s: %v", cidr, err)
+		t.logger.Infof("[TUN] Добавление псевдонима маршрута: %s -> TUN", cidr)
+		if err := t.addDeviceRoute(cidr, realName); err != nil {
+			return fmt.Errorf("не удалось добавить маршрут NAT %s: %w", cidr, err)
 		}
 	}
 
-	// 3. 初始化 gVisor 用户态协议栈
-	t.initNetstack()
-
-	// 4. 启动数据泵
+	t.wg.Add(2)
 	go t.pumpTunToStack()
 	go t.pumpStackToTun()
 
-	t.logger.Infof("[TUN] 模式启动成功! IP: %s Peer: %s", t.tunIP, t.peerIP)
+	t.logger.Infof("[TUN] Режим успешно запущен: IP-адрес %s, адрес узла %s", t.tunIP, t.peerIP)
 
+	cleanup = false
 	return nil
 }
 
-// Close 关闭服务
+// Close stops the service and removes its routes.
 func (t *TunService) Close() error {
+	var closeErr error
 	t.closeOnce.Do(func() {
 		if t.dev != nil {
 			t.dev.Close()
@@ -184,12 +164,19 @@ func (t *TunService) Close() error {
 		if t.stack != nil {
 			t.stack.Close()
 		}
+		t.wg.Wait()
+		for i := len(t.addedRoutes) - 1; i >= 0; i-- {
+			args := append([]string{"route", "del"}, t.addedRoutes[i]...)
+			if output, err := t.runCommand(args...); err != nil && !strings.Contains(string(output), "No such process") {
+				closeErr = fmt.Errorf("не удалось удалить маршрут %v: %s: %w", t.addedRoutes[i], strings.TrimSpace(string(output)), err)
+			}
+		}
 	})
-	return nil
+	return closeErr
 }
 
-// initNetstack 初始化 gVisor 协议栈
-func (t *TunService) initNetstack() {
+// initNetstack initializes the gVisor network stack.
+func (t *TunService) initNetstack() error {
 	s := stack.New(stack.Options{
 		NetworkProtocols:   []stack.NetworkProtocolFactory{ipv4.NewProtocol},
 		TransportProtocols: []stack.TransportProtocolFactory{tcp.NewProtocol, udp.NewProtocol},
@@ -199,7 +186,7 @@ func (t *TunService) initNetstack() {
 	t.endpoint = e
 
 	if err := s.CreateNIC(1, e); err != nil {
-		t.logger.Fatalf("[TUN] 创建 NIC 失败: %v", err)
+		return fmt.Errorf("не удалось создать NIC: %v", err)
 	}
 
 	parsedIP := net.ParseIP(t.tunIP)
@@ -208,18 +195,18 @@ func (t *TunService) initNetstack() {
 		Protocol: ipv4.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddressWithPrefix{
 			Address:   addr,
-			PrefixLen: 24, // 对应 255.255.255.0
+			PrefixLen: t.prefix,
 		},
 	}
 	if err := s.AddProtocolAddress(1, protocolAddr, stack.AddressProperties{}); err != nil {
-		t.logger.Fatalf("[TUN] 添加协议地址失败: %v", err)
+		return fmt.Errorf("не удалось добавить адрес протокола: %v", err)
 	}
 
 	if err := s.SetPromiscuousMode(1, true); err != nil {
-		t.logger.Fatalf("设置混杂模式失败: %v", err)
+		return fmt.Errorf("не удалось установить неразборчивый режим: %v", err)
 	}
 	if err := s.SetSpoofing(1, true); err != nil {
-		t.logger.Fatalf("设置 Spoofing 失败: %v", err)
+		return fmt.Errorf("не удалось включить подмену адресов: %v", err)
 	}
 
 	s.SetRouteTable([]tcpip.Route{
@@ -229,28 +216,23 @@ func (t *TunService) initNetstack() {
 		},
 	})
 
-	// TCP Handler
 	tcpHandler := tcp.NewForwarder(s, 0, 10, func(r *tcp.ForwarderRequest) {
 		id := r.ID()
 		destIP := id.LocalAddress.String()
 		destPort := id.LocalPort
 
-		// --- 地址重写逻辑 (NAT) ---
 		targetHost := destIP
 		parsedDestIP := net.ParseIP(destIP)
 
 		if parsedDestIP != nil {
-			parsedDestIP = parsedDestIP.To4() // Ensure IPv4
+			parsedDestIP = parsedDestIP.To4()
 			if parsedDestIP != nil {
 				for _, rule := range t.cfg.SubnetAliases {
 					if rule.Src.Contains(parsedDestIP) {
-						// 计算偏移量: destIP - rule.Src.IP
-						offset := ipSub(parsedDestIP, rule.Src.IP)
-						// 计算新目标: rule.Dst.IP + offset
-						realTargetIP := ipAdd(rule.Dst.IP, offset)
-
+						offset, _ := ipSub(parsedDestIP, rule.Src.IP)
+						realTargetIP, _ := ipAdd(rule.Dst.IP, offset)
 						targetHost = realTargetIP.String()
-						t.logger.Infof("[TUN] 命中 NAT 规则: %s -> %s (Offset: %d)", destIP, targetHost, offset)
+						t.logger.Infof("[TUN] Сработало NAT-правило: %s -> %s (смещение: %d)", destIP, targetHost, offset)
 						break
 					}
 				}
@@ -258,13 +240,12 @@ func (t *TunService) initNetstack() {
 		}
 
 		targetAddr := fmt.Sprintf("%s:%d", targetHost, destPort)
-		// ------------------------
+		t.logger.Infof("[TUN] Получен TCP-запрос -> %s (исходная цель: %s:%d)", targetAddr, destIP, destPort)
 
-		t.logger.Infof("[TUN] 收到 TCP 连接请求 -> %s (原始目标: %s:%d)", targetAddr, destIP, destPort)
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			t.logger.Errorf("创建 TCP Endpoint 失败: %v", err)
+			t.logger.Errorf("Не удалось создать конечную точку TCP: %v", err)
 			r.Complete(true)
 			return
 		}
@@ -274,7 +255,6 @@ func (t *TunService) initNetstack() {
 	})
 	s.SetTransportProtocolHandler(tcp.ProtocolNumber, tcpHandler.HandlePacket)
 
-	// UDP Handler (DNS)
 	udpHandler := udp.NewForwarder(s, func(r *udp.ForwarderRequest) bool {
 		id := r.ID()
 		if id.LocalPort != 53 {
@@ -284,7 +264,7 @@ func (t *TunService) initNetstack() {
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			t.logger.Errorf("[TUN] 创建 UDP Endpoint 失败: %v", err)
+			t.logger.Errorf("[TUN] Не удалось создать конечную точку UDP: %v", err)
 			return true
 		}
 
@@ -295,9 +275,9 @@ func (t *TunService) initNetstack() {
 	s.SetTransportProtocolHandler(udp.ProtocolNumber, udpHandler.HandlePacket)
 
 	t.stack = s
+	return nil
 }
 
-// handleUDPForward (DNS)
 func (t *TunService) handleUDPForward(conn *gonet.UDPConn, targetIP string, targetPort uint16) {
 	defer conn.Close()
 	buf := make([]byte, 2048)
@@ -312,12 +292,16 @@ func (t *TunService) handleUDPForward(conn *gonet.UDPConn, targetIP string, targ
 	copy(tcpQuery[2:], dnsQuery)
 
 	targetAddr := fmt.Sprintf("%s:%d", targetIP, targetPort)
-	remoteConn, err := t.ssh.Dial("tcp", targetAddr)
+	if t.router != nil && t.router.Match(targetIP) == router.ActionReject {
+		return
+	}
+	remoteConn, err := t.dial(targetIP, targetAddr)
 	if err != nil {
-		t.logger.Warnf("[TUN] 连接远程 DNS 失败 %s: %v", targetAddr, err)
+		t.logger.Warnf("[TUN] Не удалось подключиться к удалённому DNS %s: %v", targetAddr, err)
 		return
 	}
 	defer remoteConn.Close()
+	_ = remoteConn.SetDeadline(time.Now().Add(t.cfg.Timeout))
 
 	if _, err := remoteConn.Write(tcpQuery); err != nil {
 		return
@@ -334,16 +318,19 @@ func (t *TunService) handleUDPForward(conn *gonet.UDPConn, targetIP string, targ
 	conn.Write(respBuf)
 }
 
-// handleTCPForward (Traffic)
 func (t *TunService) handleTCPForward(localConn net.Conn, targetAddr string) {
 	defer localConn.Close()
-	remoteConn, err := t.ssh.Dial("tcp", targetAddr)
+	host, _, _ := net.SplitHostPort(targetAddr)
+	if t.router != nil && t.router.Match(host) == router.ActionReject {
+		return
+	}
+	remoteConn, err := t.dial(host, targetAddr)
 	if err != nil {
-		t.logger.Warnf("[TUN] 连接目标失败 %s: %v", targetAddr, err)
+		t.logger.Warnf("[TUN] Не удалось подключиться к цели %s: %v", targetAddr, err)
 		return
 	}
 	defer remoteConn.Close()
-	t.logger.Infof("[TUN] 隧道建立: %s <-> %s", localConn.RemoteAddr(), targetAddr)
+	t.logger.Infof("[TUN] Туннель установлен: %s <-> %s", localConn.RemoteAddr(), targetAddr)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -363,22 +350,24 @@ func (t *TunService) handleTCPForward(localConn net.Conn, targetAddr string) {
 	wg.Wait()
 }
 
-// pumpTunToStack 将 TUN 设备读取的数据写入 gVisor Stack
+func (t *TunService) dial(host, addr string) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), t.cfg.Timeout)
+	defer cancel()
+	if t.router != nil && t.router.Match(host) == router.ActionDirect {
+		return (&net.Dialer{Timeout: t.cfg.Timeout}).DialContext(ctx, "tcp", addr)
+	}
+	return t.ssh.DialContext(ctx, "tcp", addr)
+}
+
 func (t *TunService) pumpTunToStack() {
-	// WireGuard tun Read 使用 Batch API
+	defer t.wg.Done()
 	const batchSize = 1
 	bufs := make([][]byte, batchSize)
 	for i := 0; i < batchSize; i++ {
 		bufs[i] = make([]byte, 1600)
 	}
 	sizes := make([]int, batchSize)
-
-	// offset 在 Windows (Wintun) 上通常是 0
-	// 在 Unix (macOS/Linux) 上，WireGuard 实现通常需要 4 字节 offset 用于处理 PI Header
-	offset := 0
-	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		offset = 4
-	}
+	offset := 4
 
 	for {
 		n, err := t.dev.Read(bufs, sizes, offset)
@@ -386,14 +375,13 @@ func (t *TunService) pumpTunToStack() {
 			if strings.Contains(err.Error(), "file already closed") || strings.Contains(err.Error(), "closed network connection") {
 				return
 			}
-			t.logger.Errorf("[TUN] 读取设备失败: %v", err)
+			t.logger.Errorf("[TUN] Ошибка чтения устройства: %v", err)
 			return
 		}
 
 		for i := 0; i < n; i++ {
 			size := sizes[i]
 			data := bufs[i][offset : offset+size]
-
 			packetBuf := stack.NewPacketBuffer(stack.PacketBufferOptions{
 				Payload: buffer.MakeWithData(data),
 			})
@@ -402,107 +390,63 @@ func (t *TunService) pumpTunToStack() {
 	}
 }
 
-// pumpStackToTun 将 gVisor Stack 的输出写入 TUN 设备
 func (t *TunService) pumpStackToTun() {
-	offset := 0
-	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
-		offset = 4
-	}
+	defer t.wg.Done()
+	offset := 4
 
 	for {
 		pkt := t.endpoint.Read()
 		if pkt == nil {
-			continue
+			return
 		}
 		views := pkt.ToView().ToSlice()
-		pkt.DecRef()
 
-		// WireGuard Write 也是 batch 接口
-		// 我们需要为 offset 预留空间
 		buf := make([]byte, offset+len(views))
 		copy(buf[offset:], views)
+		pkt.DecRef()
 
 		_, err := t.dev.Write([][]byte{buf}, offset)
 		if err != nil {
 			if strings.Contains(err.Error(), "file already closed") || strings.Contains(err.Error(), "closed network connection") {
 				return
 			}
-			t.logger.Errorf("[TUN] 写入设备失败: %v", err)
+			t.logger.Errorf("[TUN] Ошибка записи на устройство: %v", err)
 			return
 		}
 	}
 }
 
-// setupTunIP 配置网卡 IP
 func (t *TunService) setupTunIP(devName string) error {
-	t.logger.Infof("[TUN] 正在配置 %s IP: %s (Peer: %s)", devName, t.tunIP, t.peerIP)
+	t.logger.Infof("[TUN] Настройка IP-адреса %s: %s", devName, t.tunIP)
 
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("ifconfig", devName, t.tunIP, t.peerIP, "up")
-	case "linux":
-		err := exec.Command("ip", "addr", "add", fmt.Sprintf("%s/24", t.tunIP), "dev", devName).Run()
-		if err != nil {
-			return err
-		}
-		cmd = exec.Command("ip", "link", "set", devName, "up")
-	case "windows":
-		// Windows Wintun 配置
-		cmd = exec.Command("netsh", "interface", "ip", "set", "address",
-			fmt.Sprintf("name=%s", devName),
-			"source=static",
-			fmt.Sprintf("addr=%s", t.tunIP),
-			fmt.Sprintf("mask=%s", t.tunMask),
-		)
-	default:
-		return fmt.Errorf("不支持的操作系统")
+	output, err := t.runCommand("addr", "add", fmt.Sprintf("%s/%d", t.tunIP, t.prefix), "dev", devName)
+	if err != nil {
+		return fmt.Errorf("ip addr add: %s: %w", strings.TrimSpace(string(output)), err)
 	}
-
-	if cmd != nil {
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			outputStr := string(output)
-			// Windows 下如果 IP 已存在，netsh 可能报错 "对象已存在" 或 "Object already exists"
-			if runtime.GOOS == "windows" {
-				if strings.Contains(outputStr, "Object already exists") || strings.Contains(outputStr, "对象已存在") {
-					t.logger.Warnf("[TUN] Windows IP 配置提示: %s (视为成功)", strings.TrimSpace(outputStr))
-					return nil
-				}
-
-				// 双重检查：尝试检查是否实际上已经配置成功
-				checkCmd := exec.Command("netsh", "interface", "ip", "show", "address", fmt.Sprintf("name=%s", devName))
-				checkOut, checkErr := checkCmd.CombinedOutput()
-				if checkErr == nil && strings.Contains(string(checkOut), t.tunIP) {
-					t.logger.Warnf("[TUN] 配置 IP 命令返回错误，但检测到 IP 已存在，忽略错误: %v", err)
-					return nil
-				}
-			}
-			return fmt.Errorf("执行命令失败: %s, %v", outputStr, err)
-		}
+	output, err = t.runCommand("link", "set", devName, "up")
+	if err != nil {
+		return fmt.Errorf("ip link set: %s: %w", strings.TrimSpace(string(output)), err)
 	}
 	return nil
 }
 
-// setupRoutes 配置路由
 func (t *TunService) setupRoutes(devName string) error {
-	t.logger.Infof("[TUN] 正在配置路由: %v", t.routes)
+	t.logger.Infof("[TUN] Настройка маршрутов: %v", t.routes)
 	for _, cidr := range t.routes {
-		if err := t.addRoute(cidr, t.tunIP, devName); err != nil {
-			t.logger.Errorf("[TUN] 添加路由失败 %s: %v", cidr, err)
+		if err := t.addDeviceRoute(cidr, devName); err != nil {
+			return fmt.Errorf("ошибка добавления маршрута %s: %w", cidr, err)
 		}
 	}
 	return nil
 }
 
-// setupGlobalRoutes 配置全局路由
 func (t *TunService) setupGlobalRoutes(devName string) error {
-	t.logger.Info("[TUN] 正在配置全局路由...")
+	t.logger.Info("[TUN] Настройка глобальных маршрутов...")
 	gateway, err := t.getDefaultGateway()
 	if err != nil {
-		return fmt.Errorf("无法获取默认网关: %v", err)
+		return fmt.Errorf("не удалось получить шлюз по умолчанию: %w", err)
 	}
-	t.logger.Infof("[TUN] 检测到默认网关: %s", gateway)
+	t.logger.Infof("[TUN] Обнаружен шлюз по умолчанию: %s", gateway)
 
 	sshHost := t.cfg.SSHServer
 	if host, _, err := net.SplitHostPort(sshHost); err == nil {
@@ -511,148 +455,76 @@ func (t *TunService) setupGlobalRoutes(devName string) error {
 
 	sshIPs, err := net.LookupIP(sshHost)
 	if err != nil {
-		return fmt.Errorf("无法解析 SSH 服务器 IP: %v", err)
+		return fmt.Errorf("не удалось определить IP-адрес SSH-сервера: %w", err)
 	}
 	if len(sshIPs) == 0 {
-		return fmt.Errorf("SSH 服务器 IP 解析为空")
+		return fmt.Errorf("IP SSH-сервера не найден")
 	}
-	targetSSH_IP := sshIPs[0].String()
-	t.logger.Infof("[TUN] 为 SSH 服务器 %s (%s) 添加绕过路由 via %s", sshHost, targetSSH_IP, gateway)
+	var targetSSHIP string
+	for _, ip := range sshIPs {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			targetSSHIP = ipv4.String()
+			break
+		}
+	}
+	if targetSSHIP == "" {
+		return fmt.Errorf("у SSH-сервера нет IPv4-адреса")
+	}
+	t.logger.Infof("[TUN] Добавление обходного маршрута для SSH-сервера %s (%s) через %s", sshHost, targetSSHIP, gateway)
 
-	if err := t.addRoute(targetSSH_IP, gateway, ""); err != nil {
-		return fmt.Errorf("添加 SSH 绕过路由失败: %v", err)
+	if err := t.addGatewayRoute(targetSSHIP, gateway); err != nil {
+		return fmt.Errorf("не удалось добавить обходной маршрут SSH: %w", err)
 	}
 
-	t.logger.Info("[TUN] 添加全局覆盖路由 (0.0.0.0/1, 128.0.0.0/1)...")
-	if err := t.addRoute("0.0.0.0/1", t.tunIP, devName); err != nil {
-		return fmt.Errorf("添加 0.0.0.0/1 路由失败: %v", err)
+	t.logger.Info("[TUN] Добавление глобальных маршрутов (0.0.0.0/1, 128.0.0.0/1)...")
+	if err := t.addDeviceRoute("0.0.0.0/1", devName); err != nil {
+		return fmt.Errorf("не удалось добавить маршрут 0.0.0.0/1: %w", err)
 	}
-	if err := t.addRoute("128.0.0.0/1", t.tunIP, devName); err != nil {
-		return fmt.Errorf("添加 128.0.0.0/1 路由失败: %v", err)
+	if err := t.addDeviceRoute("128.0.0.0/1", devName); err != nil {
+		return fmt.Errorf("не удалось добавить маршрут 128.0.0.0/1: %w", err)
 	}
 	return nil
 }
 
-// addRoute 添加路由
-func (t *TunService) addRoute(target, gateway, devName string) error {
-	var cmd *exec.Cmd
+func (t *TunService) addDeviceRoute(target, devName string) error {
+	return t.addRoute([]string{target, "dev", devName})
+}
 
-	// Windows 解析 CIDR
-	var destIP, mask string
-	if runtime.GOOS == "windows" {
-		ip, network, err := net.ParseCIDR(target)
-		if err == nil {
-			destIP = ip.String()
-			mask = net.IP(network.Mask).String()
-		} else {
-			destIP = target
-			mask = "255.255.255.255"
-		}
-	}
+func (t *TunService) addGatewayRoute(target, gateway string) error {
+	return t.addRoute([]string{target, "via", gateway})
+}
 
-	switch runtime.GOOS {
-	case "darwin":
-		if (gateway == t.tunIP || gateway == t.peerIP) && devName != "" {
-			cmd = exec.Command("route", "add", target, "-interface", devName)
-		} else {
-			cmd = exec.Command("route", "add", target, gateway)
-		}
-	case "linux":
-		args := []string{"route", "add", target, "via", gateway}
-		cmd = exec.Command("ip", args...)
-	case "windows":
-		// Windows: Wintun 是 L3
-		// 1. 先删 (忽略错误)
-		exec.Command("route", "delete", destIP).Run()
-
-		// 2. 准备添加命令
-		isTunRoute := false
-		routeGw := gateway
-
-		// 如果网关是 "0.0.0.0" 或 tunIP 或 peerIP，说明是要进 TUN
-		if gateway == "0.0.0.0" || gateway == t.tunIP || gateway == t.peerIP {
-			isTunRoute = true
-			routeGw = "0.0.0.0" // Wintun 标准网关
-		}
-
-		// 强制 METRIC 1 以提高优先级
-		args := []string{"add", destIP, "mask", mask, routeGw, "METRIC", "1"}
-
-		// 【关键修复】如果是 TUN 路由，必须指定 IF 索引
-		if isTunRoute && t.ifIndex > 0 {
-			args = append(args, "IF", fmt.Sprintf("%d", t.ifIndex))
-		}
-
-		cmd = exec.Command("route", args...)
-	default:
-		return fmt.Errorf("不支持的操作系统")
-	}
-
-	t.logger.Infof("[TUN] 执行路由命令: %s", cmd.String())
-	if output, err := cmd.CombinedOutput(); err != nil {
+func (t *TunService) addRoute(routeArgs []string) error {
+	args := append([]string{"route", "add"}, routeArgs...)
+	if output, err := t.runCommand(args...); err != nil {
 		outStr := string(output)
-		// 处理 "路由添加失败: 对象已存在"
-		if strings.Contains(outStr, "File exists") || strings.Contains(outStr, "exist") || strings.Contains(outStr, "已存在") {
-			t.logger.Warnf("[TUN] 路由已存在，忽略错误: %s", outStr)
+		if strings.Contains(outStr, "File exists") || strings.Contains(outStr, "exist") {
+			t.logger.Warnf("[TUN] Маршрут уже существует, игнорирование: %s", outStr)
 			return nil
 		}
-		return fmt.Errorf("cmd: %s, output: %s, err: %v", cmd.String(), outStr, err)
+		return fmt.Errorf("ip %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(outStr), err)
 	}
+	t.addedRoutes = append(t.addedRoutes, append([]string(nil), routeArgs...))
 	return nil
 }
 
-// getDefaultGateway (同上)
 func (t *TunService) getDefaultGateway() (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		out, err := exec.Command("route", "-n", "get", "default").Output()
-		if err != nil {
-			return "", err
-		}
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "gateway:") {
-				parts := strings.Fields(line)
-				if len(parts) >= 2 {
-					return parts[1], nil
-				}
-			}
-		}
-	case "linux":
-		out, err := exec.Command("ip", "route", "show", "default").Output()
-		if err != nil {
-			return "", err
-		}
-		parts := strings.Fields(string(out))
-		if len(parts) >= 3 && parts[0] == "default" && parts[1] == "via" {
-			return parts[2], nil
-		}
-	case "windows":
-		out, err := exec.Command("route", "print", "0.0.0.0").Output()
-		if err != nil {
-			return "", err
-		}
-		lines := strings.Split(string(out), "\n")
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if strings.HasPrefix(line, "0.0.0.0") {
-				fields := strings.Fields(line)
-				if len(fields) >= 3 {
-					return fields[2], nil
-				}
-			}
-		}
+	out, err := exec.Command("ip", "route", "show", "default").Output()
+	if err != nil {
+		return "", err
 	}
-	return "", fmt.Errorf("未找到默认网关")
+	parts := strings.Fields(string(out))
+	if len(parts) >= 3 && parts[0] == "default" && parts[1] == "via" {
+		return parts[2], nil
+	}
+	return "", fmt.Errorf("шлюз по умолчанию не найден")
 }
 
-// checkRouteConflicts 检查请求的路由是否与本机物理网卡冲突
-func (t *TunService) checkRouteConflicts() {
+func (t *TunService) checkRouteConflicts() error {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		t.logger.Warnf("[TUN] 无法获取本机网卡信息，跳过冲突检测: %v", err)
-		return
+		t.logger.Warnf("[TUN] Не удалось получить список сетевых интерфейсов, пропуск проверки конфликтов: %v", err)
+		return nil
 	}
 
 	sshHost := t.cfg.SSHServer
@@ -661,24 +533,20 @@ func (t *TunService) checkRouteConflicts() {
 	}
 	sshIPs, _ := net.LookupIP(sshHost)
 
-	// check conflict with t.routes & SubnetAliases
-	checkConflict := func(targetCIDR string, targetName string) {
+	checkConflict := func(targetCIDR string) error {
 		_, network, err := net.ParseCIDR(targetCIDR)
 		if err != nil {
-			return
+			return nil
 		}
 
-		// 1. 检查 SSH Server 死循环
 		for _, sshIP := range sshIPs {
 			sshIPV4 := sshIP.To4()
 			if sshIPV4 != nil && network.Contains(sshIPV4) {
-				t.logger.Fatalf("[TUN] ❌ 致命错误: SSH 服务器 IP %s 包含在路由网段 %s 中！这将导致死循环 (SSH 流量被 TUN 拦截)。请调整路由或别名设置。", sshIPV4, targetCIDR)
+				return fmt.Errorf("IP SSH-сервера %s входит в подсеть маршрута %s", sshIPV4, targetCIDR)
 			}
 		}
 
-		// 2. 检查本机网卡冲突
 		for _, iface := range ifaces {
-			// 跳过 Loopback 和 Down 的接口
 			if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
 				continue
 			}
@@ -697,26 +565,32 @@ func (t *TunService) checkRouteConflicts() {
 				}
 
 				if network.Contains(ip) {
-					t.logger.Warnf("[TUN] ⚠️ 路由冲突警告: 请求的路由 %s 包含了本机网卡 %s 的 IP %s。这可能导致流量优先走物理网卡而跳过 TUN，导致代理不生效！", targetCIDR, iface.Name, ip.String())
+					t.logger.Warnf("[TUN] Предупреждение о конфликте маршрутов: запрошенный маршрут %s содержит IP %s интерфейса %s. Трафик может пойти через физический интерфейс.", targetCIDR, iface.Name, ip.String())
 				}
 			}
 		}
+		return nil
 	}
 
 	for _, route := range t.routes {
-		checkConflict(route, "User Route")
+		if err := checkConflict(route); err != nil {
+			return err
+		}
 	}
 	for _, alias := range t.cfg.SubnetAliases {
-		checkConflict(alias.Src.String(), "Alias Route")
+		if err := checkConflict(alias.Src.String()); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-// Helper functions for IP arithmetic
-func ipToUint32(ip net.IP) uint32 {
-	if len(ip) == 16 {
-		return binary.BigEndian.Uint32(ip[12:16])
+func ipToUint32(ip net.IP) (uint32, error) {
+	ip = ip.To4()
+	if ip == nil {
+		return 0, errors.New("ожидался IPv4-адрес")
 	}
-	return binary.BigEndian.Uint32(ip)
+	return binary.BigEndian.Uint32(ip), nil
 }
 
 func uint32ToIP(n uint32) net.IP {
@@ -725,11 +599,25 @@ func uint32ToIP(n uint32) net.IP {
 	return ip
 }
 
-func ipAdd(ip net.IP, offset uint32) net.IP {
-	val := ipToUint32(ip)
-	return uint32ToIP(val + offset)
+func ipAdd(ip net.IP, offset uint32) (net.IP, error) {
+	val, err := ipToUint32(ip)
+	if err != nil || offset > ^uint32(0)-val {
+		return nil, errors.New("переполнение IPv4-адреса")
+	}
+	return uint32ToIP(val + offset), nil
 }
 
-func ipSub(a, b net.IP) uint32 {
-	return ipToUint32(a) - ipToUint32(b)
+func ipSub(a, b net.IP) (uint32, error) {
+	av, err := ipToUint32(a)
+	if err != nil {
+		return 0, err
+	}
+	bv, err := ipToUint32(b)
+	if err != nil {
+		return 0, err
+	}
+	if av < bv {
+		return 0, errors.New("отрицательное смещение IPv4-адреса")
+	}
+	return av - bv, nil
 }

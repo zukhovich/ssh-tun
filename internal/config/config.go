@@ -8,42 +8,50 @@ import (
 	"time"
 )
 
-// SubnetAlias 定义网段映射规则
+// SubnetAlias defines a subnet mapping rule.
 type SubnetAlias struct {
 	Src *net.IPNet
 	Dst *net.IPNet
 }
 
-// Config 存储应用配置
+// Config stores the resolved application configuration.
 type Config struct {
 	ListenAddr      string
 	SSHServer       string
 	SSHUser         string
 	SSHPassword     string
 	SSHKeyFile      string
-	HTTPUpstream    string        // 强制 HTTP 上游 (原 SSHTargetDial)
-	SSHPort         string        // 添加SSH端口配置
-	SocksAddr       string        // SOCKS5 监听地址
-	TunMode         bool          // 是否启用 TUN 模式
-	TunCIDR         string        // TUN 设备 CIDR (e.g. 10.0.0.1/24)
-	TunRoute        []string      // 需要路由到 TUN 的网段
-	TunGlobal       bool          // 是否开启全局模式
-	SubnetAliases   []SubnetAlias // 网段/IP映射规则 (NAT)
-	JumpHosts       []string      // 跳板机列表
+	KnownHostsFile  string
+	InsecureHostKey bool
+	HTTPUpstream    string
+	SSHPort         string
+	SocksAddr       string
+	TunMode         bool
+	TunCIDR         string
+	TunRoute        []string
+	TunGlobal       bool
+	SubnetAliases   []SubnetAlias
+	JumpHosts       []string
 	Timeout         time.Duration
 	Verbose         bool
 	LogFile         string
 	InteractiveAuth bool
-	SystemProxy     bool // 是否启用系统代理
+	SystemProxy     bool
 	RuleFile        string
+	ServiceManager  string
+	ServiceName     string
+	ServiceUser     string
+	ServiceGroup    string
+	ServiceEnable   bool
+	ServiceStart    bool
 }
 
-// NewConfig 创建默认配置
+// NewConfig returns the default configuration.
 func NewConfig() *Config {
 	return &Config{
 		ListenAddr:      ":8080",
 		SSHServer:       "",
-		SSHPort:         "22", // 默认SSH端口
+		SSHPort:         "22",
 		JumpHosts:       []string{},
 		Timeout:         10 * time.Second,
 		Verbose:         false,
@@ -56,12 +64,17 @@ func NewConfig() *Config {
 		TunRoute:        []string{},
 		TunGlobal:       false,
 		SubnetAliases:   []SubnetAlias{},
+		ServiceManager:  "auto",
+		ServiceName:     "ssh-tun",
+		ServiceUser:     "root",
+		ServiceGroup:    "root",
+		ServiceEnable:   true,
+		ServiceStart:    true,
 	}
 }
 
-// parseJumpHost 解析跳板机格式
+// parseJumpHost parses an SSH jump host address.
 func parseJumpHost(jumpHost string) (user, host, port string, err error) {
-	// 支持格式: user@host:port, user@host, host:port, host
 	parts := strings.Split(jumpHost, "@")
 
 	var hostPart string
@@ -71,58 +84,128 @@ func parseJumpHost(jumpHost string) (user, host, port string, err error) {
 	} else if len(parts) == 1 {
 		hostPart = parts[0]
 	} else {
-		return "", "", "", fmt.Errorf("无效的跳板机格式: %s", jumpHost)
+		return "", "", "", fmt.Errorf("неверный формат промежуточного SSH-узла: %s", jumpHost)
 	}
 
-	// 解析主机和端口
-	if strings.Contains(hostPart, ":") {
-		hostPortParts := strings.Split(hostPart, ":")
-		if len(hostPortParts) != 2 {
-			return "", "", "", fmt.Errorf("无效的主机:端口格式: %s", hostPart)
+	if strings.HasPrefix(hostPart, "[") {
+		if strings.Contains(hostPart, "]:") {
+			host, port, err = net.SplitHostPort(hostPart)
+		} else if strings.HasSuffix(hostPart, "]") {
+			host = strings.TrimSuffix(strings.TrimPrefix(hostPart, "["), "]")
+			port = "22"
+		} else {
+			err = fmt.Errorf("неверный IPv6-адрес: %s", hostPart)
 		}
-		host = hostPortParts[0]
-		port = hostPortParts[1]
+	} else if strings.Count(hostPart, ":") == 1 {
+		host, port, err = net.SplitHostPort(hostPart)
+	} else if strings.Contains(hostPart, ":") {
+		return "", "", "", fmt.Errorf("IPv6-адрес должен быть заключён в квадратные скобки: %s", hostPart)
 	} else {
 		host = hostPart
-		port = "22" // 默认SSH端口
+		port = "22"
+	}
+	if err != nil {
+		return "", "", "", fmt.Errorf("неверный формат хост:порт %s: %w", hostPart, err)
 	}
 
-	if host == "" {
-		return "", "", "", fmt.Errorf("主机名不能为空")
+	if host == "" || port == "" {
+		return "", "", "", fmt.Errorf("имя хоста и порт не могут быть пустыми")
+	}
+	if err := validatePort(port); err != nil {
+		return "", "", "", err
 	}
 
 	return user, host, port, nil
 }
 
-// Validate 验证配置
+// Validate checks the resolved configuration.
 func (c *Config) Validate() error {
 	if c.SSHServer == "" {
-		return errors.New("必须提供SSH服务器地址")
+		return errors.New("необходимо указать адрес SSH-сервера")
 	}
 
 	if c.SSHUser == "" {
-		return errors.New("必须提供SSH用户名")
+		return errors.New("необходимо указать имя пользователя SSH")
+	}
+	if c.Timeout <= 0 {
+		return errors.New("таймаут должен быть больше нуля")
+	}
+	if _, _, err := net.SplitHostPort(c.ListenAddr); err != nil {
+		return fmt.Errorf("неверный адрес HTTP-прокси: %w", err)
+	}
+	if c.SocksAddr != "" {
+		if _, _, err := net.SplitHostPort(c.SocksAddr); err != nil {
+			return fmt.Errorf("неверный адрес SOCKS5-прокси: %w", err)
+		}
+	}
+	if c.HTTPUpstream != "" {
+		if _, _, err := net.SplitHostPort(c.HTTPUpstream); err != nil {
+			return fmt.Errorf("неверный адрес вышестоящего HTTP-сервера: %w", err)
+		}
 	}
 
 	if !c.InteractiveAuth && c.SSHPassword == "" && c.SSHKeyFile == "" {
-		return errors.New("必须提供SSH密码、私钥文件或使用交互式认证")
+		return errors.New("необходимо указать пароль SSH, файл ключа или использовать интерактивную аутентификацию")
 	}
 
-	// 验证跳板机格式
 	for _, jumpHost := range c.JumpHosts {
 		if jumpHost == "" {
 			continue
 		}
 		_, _, _, err := parseJumpHost(jumpHost)
 		if err != nil {
-			return fmt.Errorf("跳板机格式错误: %v", err)
+			return fmt.Errorf("неверно указан промежуточный SSH-узел: %w", err)
 		}
 	}
 
 	return nil
 }
 
-// GetJumpHostInfo 获取跳板机信息
+func validatePort(port string) error {
+	n, err := net.LookupPort("tcp", port)
+	if err != nil || n < 1 || n > 65535 {
+		return fmt.Errorf("неверный TCP-порт: %s", port)
+	}
+	return nil
+}
+
+// ParseSubnetAlias parses a mapping between two IPv4 subnets.
+func ParseSubnetAlias(value string) (SubnetAlias, error) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 2 {
+		return SubnetAlias{}, fmt.Errorf("неверный формат NAT-правила %q, ожидается Src:Dst", value)
+	}
+	parseNet := func(value string) (*net.IPNet, error) {
+		if ip := net.ParseIP(value); ip != nil {
+			ip = ip.To4()
+			if ip == nil {
+				return nil, fmt.Errorf("IPv6 не поддерживается: %s", value)
+			}
+			return &net.IPNet{IP: ip, Mask: net.CIDRMask(32, 32)}, nil
+		}
+		ip, network, err := net.ParseCIDR(value)
+		if err != nil || ip.To4() == nil {
+			return nil, fmt.Errorf("неверный IPv4-адрес или CIDR: %s", value)
+		}
+		return network, nil
+	}
+	src, err := parseNet(parts[0])
+	if err != nil {
+		return SubnetAlias{}, err
+	}
+	dst, err := parseNet(parts[1])
+	if err != nil {
+		return SubnetAlias{}, err
+	}
+	srcPrefix, _ := src.Mask.Size()
+	dstPrefix, _ := dst.Mask.Size()
+	if srcPrefix != dstPrefix {
+		return SubnetAlias{}, fmt.Errorf("длины масок исходной и целевой подсетей не совпадают: %d и %d", srcPrefix, dstPrefix)
+	}
+	return SubnetAlias{Src: src, Dst: dst}, nil
+}
+
+// GetJumpHostInfo returns the parsed SSH jump host fields.
 func (c *Config) GetJumpHostInfo(jumpHost string) (user, host, port string, err error) {
 	return parseJumpHost(jumpHost)
 }

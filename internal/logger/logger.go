@@ -6,9 +6,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 )
 
-// LogLevel 定义日志级别
+// LogLevel defines a logging level.
 type LogLevel int
 
 const (
@@ -19,15 +20,16 @@ const (
 	LevelFatal
 )
 
-// Logger 处理应用日志
+// Logger writes application log messages.
 type Logger struct {
+	mu      sync.Mutex
 	verbose bool
 	logger  *log.Logger
 	level   LogLevel
 	file    *os.File
 }
 
-// NewLogger 创建日志记录器
+// NewLogger creates a logger.
 func NewLogger(verbose bool) *Logger {
 	return &Logger{
 		verbose: verbose,
@@ -36,45 +38,45 @@ func NewLogger(verbose bool) *Logger {
 	}
 }
 
-// SetLogFile 设置日志输出文件
+// SetLogFile adds a file destination for log messages.
 func (l *Logger) SetLogFile(filePath string) error {
 	if filePath == "" {
 		return nil
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
 
-	// 确保日志目录存在
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("无法创建日志目录: %w", err)
+		return fmt.Errorf("не удалось создать директорию для журнала: %w", err)
 	}
 
-	// 打开或创建日志文件
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf("无法打开日志文件: %w", err)
+		return fmt.Errorf("не удалось открыть файл журнала: %w", err)
 	}
 
-	// 关闭之前的日志文件
 	if l.file != nil {
 		l.file.Close()
 	}
 
 	l.file = file
 
-	// 同时输出到控制台和文件
 	writer := io.MultiWriter(os.Stdout, file)
 	l.logger.SetOutput(writer)
 
 	return nil
 }
 
-// SetLevel 设置日志级别
+// SetLevel sets the minimum logging level.
 func (l *Logger) SetLevel(level LogLevel) {
 	l.level = level
 }
 
-// 日志输出方法
 func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	if level < l.level {
 		return
 	}
@@ -98,63 +100,52 @@ func (l *Logger) log(level LogLevel, format string, args ...interface{}) {
 	l.logger.Println(prefix + msg)
 }
 
-// Debug 记录调试日志
 func (l *Logger) Debug(msg string) {
 	if l.verbose {
-		l.log(LevelDebug, msg)
+		l.log(LevelDebug, "%s", msg)
 	}
 }
 
-// Debugf 记录格式化调试日志
 func (l *Logger) Debugf(format string, args ...interface{}) {
 	if l.verbose {
 		l.log(LevelDebug, format, args...)
 	}
 }
 
-// Info 记录信息日志
 func (l *Logger) Info(msg string) {
-	l.log(LevelInfo, msg)
+	l.log(LevelInfo, "%s", msg)
 }
 
-// Infof 记录格式化信息日志
 func (l *Logger) Infof(format string, args ...interface{}) {
 	l.log(LevelInfo, format, args...)
 }
 
-// Warn 记录警告日志
 func (l *Logger) Warn(msg string) {
-	l.log(LevelWarn, msg)
+	l.log(LevelWarn, "%s", msg)
 }
 
-// Warnf 记录格式化警告日志
 func (l *Logger) Warnf(format string, args ...interface{}) {
 	l.log(LevelWarn, format, args...)
 }
 
-// Error 记录错误日志
 func (l *Logger) Error(msg string) {
-	l.log(LevelError, msg)
+	l.log(LevelError, "%s", msg)
 }
 
-// Errorf 记录格式化错误日志
 func (l *Logger) Errorf(format string, args ...interface{}) {
 	l.log(LevelError, format, args...)
 }
 
-// Fatal 记录致命错误并退出
 func (l *Logger) Fatal(msg string) {
-	l.log(LevelFatal, msg)
+	l.log(LevelFatal, "%s", msg)
 	os.Exit(1)
 }
 
-// Fatalf 记录格式化致命错误并退出
 func (l *Logger) Fatalf(format string, args ...interface{}) {
 	l.log(LevelFatal, format, args...)
 	os.Exit(1)
 }
 
-// Close 关闭日志系统
 func (l *Logger) Close() error {
 	if l.file != nil {
 		return l.file.Close()

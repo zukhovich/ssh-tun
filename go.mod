@@ -1,4 +1,4 @@
-module github.com/Sesame2/gotun
+module github.com/zukhovich/ssh-tun
 
 go 1.25.5
 
