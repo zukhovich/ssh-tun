@@ -121,10 +121,15 @@ func T(id ID, args ...any) string {
 	return fmt.Sprintf(message, args...)
 }
 
-// Text selects an English or Russian message using the active language.
-func Text(english, russian string, args ...any) string {
+// Select returns an English or Russian message using the active language.
+func Select(english, russian string) string {
 	if Language() == "ru" {
-		return fmt.Sprintf(russian, args...)
+		return russian
 	}
-	return fmt.Sprintf(english, args...)
+	return english
+}
+
+// Text selects an English or Russian message using the active language.
+func Text(english, russian string) string {
+	return Select(english, russian)
 }

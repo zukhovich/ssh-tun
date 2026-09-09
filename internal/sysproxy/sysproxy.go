@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 	"github.com/zukhovich/ssh-tun/internal/logger"
 )
 
@@ -32,7 +33,7 @@ func NewManager(log *logger.Logger, httpListenAddr, socksListenAddr string) *Man
 	normalize := func(address, fallback string) string {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
-			log.Warnf("Не удалось разобрать адрес %s: %v; используется %s", address, err, fallback)
+			log.Warnf(i18n.Text("Failed to parse address %s: %v; using %s", "Не удалось разобрать адрес %s: %v; используется %s"), address, err, fallback)
 			return fallback
 		}
 		if host == "" || host == "0.0.0.0" || host == "::" {
@@ -62,13 +63,13 @@ func (m *Manager) Enable() error {
 		return nil
 	}
 	if err := m.saveCurrentSettings(); err != nil {
-		return fmt.Errorf("не удалось сохранить настройки прокси: %w", err)
+		return fmt.Errorf(i18n.Text("failed to save system proxy settings: %w", "не удалось сохранить настройки системного прокси: %w"), err)
 	}
 	if err := m.applySettings(); err != nil {
 		return errors.Join(err, m.restoreSettings())
 	}
 	m.enabled = true
-	m.logger.Infof("Системный прокси установлен на HTTP %s", m.httpAddr)
+	m.logger.Infof(i18n.Text("System proxy configured for HTTP %s", "Системный прокси настроен на HTTP %s"), m.httpAddr)
 	return nil
 }
 
@@ -82,7 +83,7 @@ func (m *Manager) Disable() error {
 		return err
 	}
 	m.enabled = false
-	m.logger.Info("Системный прокси восстановлен")
+	m.logger.Info(i18n.Text("System proxy settings restored", "Настройки системного прокси восстановлены"))
 	return nil
 }
 

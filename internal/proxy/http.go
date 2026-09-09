@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/zukhovich/ssh-tun/internal/config"
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 	"github.com/zukhovich/ssh-tun/internal/logger"
 	"github.com/zukhovich/ssh-tun/internal/router"
 )
@@ -69,11 +70,11 @@ func (p *HTTPOverSSH) Start() error {
 	listener, err := net.Listen("tcp", p.cfg.ListenAddr)
 	if err != nil {
 		p.mu.Unlock()
-		return fmt.Errorf("не удалось запустить HTTP-прокси: %w", err)
+		return fmt.Errorf(i18n.Text("failed to start the HTTP proxy: %w", "не удалось запустить HTTP-прокси: %w"), err)
 	}
 	p.listener = listener
 	p.mu.Unlock()
-	p.logger.Infof("HTTP/HTTPS-прокси запущен на %s", listener.Addr())
+	p.logger.Infof(i18n.Text("HTTP/HTTPS proxy is listening on %s", "HTTP/HTTPS-прокси запущен на %s"), listener.Addr())
 	err = p.server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
 		return nil
@@ -103,7 +104,7 @@ func (p *HTTPOverSSH) handlePlainHTTP(w http.ResponseWriter, req *http.Request) 
 	}
 	action := p.action(req.Host)
 	if action == router.ActionReject {
-		p.logger.Infof("Запрос отклонён правилом: %s", req.Host)
+		p.logger.Infof(i18n.Text("Request rejected by a routing rule: %s", "Запрос отклонён правилом маршрутизации: %s"), req.Host)
 		http.Error(w, "Запрос отклонён правилами маршрутизации", http.StatusForbidden)
 		return
 	}
@@ -220,7 +221,7 @@ func relay(left net.Conn, leftReader io.Reader, right net.Conn, rightReader io.R
 	copyOne := func(dst net.Conn, src io.Reader) {
 		defer wg.Done()
 		if _, err := io.Copy(dst, src); err != nil && !isConnectionClosed(err) {
-			log.Debugf("Ошибка передачи данных: %v", err)
+			log.Debugf(i18n.Text("Data transfer error: %v", "Ошибка передачи данных: %v"), err)
 		}
 		if closer, ok := dst.(interface{ CloseWrite() error }); ok {
 			_ = closer.CloseWrite()

@@ -1,12 +1,15 @@
 package router
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 )
 
 // Action defines a traffic routing action.
@@ -62,17 +65,17 @@ type routerConfig struct {
 // NewRouter loads routing rules from a YAML file.
 func NewRouter(path string) (*Router, error) {
 	if path == "" {
-		return nil, fmt.Errorf("путь к правилам не может быть пустым")
+		return nil, errors.New(i18n.Text("routing rules path must not be empty", "путь к правилам не может быть пустым"))
 	}
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("не удалось прочитать файл правил: %w", err)
+		return nil, fmt.Errorf(i18n.Text("failed to read routing rules file: %w", "не удалось прочитать файл правил маршрутизации: %w"), err)
 	}
 
 	var cfg routerConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("не удалось разобрать YAML-файл правил: %w", err)
+		return nil, fmt.Errorf(i18n.Text("failed to parse the YAML routing rules file: %w", "не удалось разобрать YAML-файл правил маршрутизации: %w"), err)
 	}
 
 	if cfg.Mode == "" {
@@ -81,7 +84,7 @@ func NewRouter(path string) (*Router, error) {
 	switch cfg.Mode {
 	case ModeRule, ModeDirect, ModeGlobal:
 	default:
-		return nil, fmt.Errorf("неизвестный режим маршрутизации: %s", cfg.Mode)
+		return nil, fmt.Errorf(i18n.Text("unknown routing mode: %s", "неизвестный режим маршрутизации: %s"), cfg.Mode)
 	}
 
 	router := &Router{
@@ -95,17 +98,17 @@ func NewRouter(path string) (*Router, error) {
 			parts[j] = strings.TrimSpace(parts[j])
 		}
 		if len(parts) < 2 || len(parts) > 3 {
-			return nil, fmt.Errorf("строка %d файла правил имеет неверный формат", i+1)
+			return nil, fmt.Errorf(i18n.Text("routing rules line %d has an invalid format", "строка %d файла правил имеет неверный формат"), i+1)
 		}
 
 		ruleType := RuleType(strings.ToUpper(parts[0]))
 		switch ruleType {
 		case DomainSuffix, DomainKeyword, Domain, IPCIDR, IPCIDR6, Match:
 		default:
-			return nil, fmt.Errorf("строка %d файла правил содержит неизвестный тип правила: %s", i+1, parts[0])
+			return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an unknown rule type: %s", "строка %d файла правил содержит неизвестный тип правила: %s"), i+1, parts[0])
 		}
 		if ruleType != Match && parts[1] == "" {
-			return nil, fmt.Errorf("строка %d файла правил содержит пустое значение", i+1)
+			return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an empty value", "строка %d файла правил содержит пустое значение"), i+1)
 		}
 
 		target := ActionProxy
@@ -118,7 +121,7 @@ func NewRouter(path string) (*Router, error) {
 			case "REJECT":
 				target = ActionReject
 			default:
-				return nil, fmt.Errorf("строка %d файла правил содержит неизвестное действие: %s", i+1, parts[2])
+				return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an unknown action: %s", "строка %d файла правил содержит неизвестное действие: %s"), i+1, parts[2])
 			}
 		}
 		payload := strings.ToLower(strings.TrimSuffix(parts[1], "."))
@@ -130,10 +133,10 @@ func NewRouter(path string) (*Router, error) {
 		if ruleType == IPCIDR || ruleType == IPCIDR6 {
 			_, network, err := net.ParseCIDR(payload)
 			if err != nil {
-				return nil, fmt.Errorf("строка %d содержит неверный CIDR: %w", i+1, err)
+				return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an invalid CIDR: %w", "строка %d содержит неверный CIDR: %w"), i+1, err)
 			}
 			if (ruleType == IPCIDR) != (network.IP.To4() != nil) {
-				return nil, fmt.Errorf("строка %d содержит CIDR неверной версии IP", i+1)
+				return nil, fmt.Errorf(i18n.Text("routing rules line %d contains a CIDR of the wrong IP version", "строка %d содержит CIDR неверной версии IP"), i+1)
 			}
 			rule.network = network
 		}

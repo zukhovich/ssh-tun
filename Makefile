@@ -1,5 +1,5 @@
 BINARY_NAME := ssh-tun
-VERSION := 1.0.0
+VERSION := 1.0.1
 BUILD_DIR := ./build
 LDFLAGS := -trimpath -ldflags "-X main.Version=$(VERSION) -s -w -extldflags=-static"
 MAIN_PACKAGE := ./cmd/ssh-tun

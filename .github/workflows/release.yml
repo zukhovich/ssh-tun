@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - "v1.0.0"
+      - "v1.0.1"
 
 permissions:
   contents: write
@@ -23,7 +23,13 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          body: |
+            - Fixed SSH public-key authentication with explicitly selected identity files.
+            - Added support for SSH agent keys and interactive unlocking of passphrase-protected identity files.
+            - Added the conventional `--identity-file` option while preserving `--identity_file` compatibility.
+            - Defaulted no-configuration startup and logs to English regardless of the system locale.
+            - Added end-to-end SSH key authentication coverage and revalidated the existing test suite.
           files: |
-            build/ssh-tun_1.0.0_linux_amd64.tar.gz
-            build/ssh-tun_1.0.0_linux_arm64.tar.gz
+            build/ssh-tun_1.0.1_linux_amd64.tar.gz
+            build/ssh-tun_1.0.1_linux_arm64.tar.gz
             build/SHA256SUMS

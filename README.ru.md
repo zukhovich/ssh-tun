@@ -2,7 +2,7 @@
 
 [English documentation](README.md)
 
-**Версия 1.0.0**
+**Версия 1.0.1**
 
 `ssh-tun` — сетевой прокси для Linux, который передаёт HTTP, HTTPS CONNECT, SOCKS5 и TUN-трафик через SSH. Поддерживаются промежуточные SSH-узлы, правила маршрутизации, отображение подсетей, настройка прокси GNOME и установка службы systemd/OpenRC.
 
@@ -24,7 +24,7 @@
 
 ## Установка
 
-Установка версии 1.0.0 из GitHub Releases:
+Установка версии 1.0.1 из GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/inst
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.0 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.1 --install-dir "$HOME/bin"
 ```
 
 ## Сборка
@@ -64,6 +64,14 @@ make package-release
 ssh-keyscan example.com >> ~/.ssh/known_hosts
 ssh-tun user@example.com --http :8080 --socks5 :1080
 ```
+
+Использование конкретного закрытого ключа через `-i`/`--identity-file`:
+
+```sh
+ssh-tun user@example.com --identity-file ~/.ssh/id_ed25519 --sys-proxy=false
+```
+
+Если файл ключа не указан, `ssh-tun` использует ключи из `ssh-agent`, а затем пробует стандартные незашифрованные файлы в `~/.ssh`. Для защищённого парольной фразой файла ключа доступен интерактивный запрос; для неинтерактивного запуска добавьте ключ в `ssh-agent`.
 
 Использование прокси:
 
@@ -108,7 +116,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-Нужны права root и `iproute2`. Версия 1.0.0 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
+Нужны права root и `iproute2`. Версия 1.0.1 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
 
 ## Язык
 
@@ -117,7 +125,7 @@ ssh-tun --lang en --help
 ssh-tun --lang ru --help
 ```
 
-Поле `language` в YAML принимает `en` или `ru`. Без явного выбора используется локаль системы.
+Поле `language` в YAML принимает `en` или `ru`. Без файла конфигурации и параметра `--lang` по умолчанию используется английский язык независимо от локали системы.
 
 ## systemd и OpenRC
 

@@ -2,7 +2,7 @@
 
 [Русская документация](README.ru.md)
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 `ssh-tun` is a Linux-only command-line network proxy that carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH. It supports SSH jump hosts, routing rules, subnet address mapping, GNOME proxy configuration, and systemd/OpenRC service installation.
 
@@ -24,7 +24,7 @@ Repository: <https://github.com/zukhovich/ssh-tun>
 
 ## Installation
 
-Install version 1.0.0 from GitHub Releases:
+Install version 1.0.1 from GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -34,7 +34,7 @@ Install into a custom directory:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.0 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.1 --install-dir "$HOME/bin"
 ```
 
 ## Build From Source
@@ -64,6 +64,14 @@ Ensure the SSH host key is present before connecting:
 ssh-keyscan example.com >> ~/.ssh/known_hosts
 ssh-tun user@example.com --http :8080 --socks5 :1080
 ```
+
+Use a specific private key with `-i`/`--identity-file`:
+
+```sh
+ssh-tun user@example.com --identity-file ~/.ssh/id_ed25519 --sys-proxy=false
+```
+
+When no identity file is specified, `ssh-tun` uses keys from `ssh-agent` and then tries standard unencrypted files in `~/.ssh`. Passphrase-protected identity files can be unlocked interactively, or loaded into `ssh-agent` for non-interactive use.
 
 Use the proxies:
 
@@ -108,7 +116,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-TUN mode requires root privileges and `iproute2`. Version 1.0.0 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
+TUN mode requires root privileges and `iproute2`. Version 1.0.1 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
 
 ## Language
 
@@ -117,7 +125,7 @@ ssh-tun --lang en --help
 ssh-tun --lang ru --help
 ```
 
-The `language` YAML field accepts `en` or `ru`. Locale detection is used when no language is specified.
+The `language` YAML field accepts `en` or `ru`. Without a configuration file or `--lang`, English is used by default regardless of the system locale.
 
 ## systemd and OpenRC
 

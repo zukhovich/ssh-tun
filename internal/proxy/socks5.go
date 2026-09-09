@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/zukhovich/ssh-tun/internal/config"
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 	"github.com/zukhovich/ssh-tun/internal/logger"
 	"github.com/zukhovich/ssh-tun/internal/router"
 )
@@ -46,18 +47,18 @@ func (s *SOCKS5OverSSH) Start() error {
 	listener, err := net.Listen("tcp", s.cfg.SocksAddr)
 	if err != nil {
 		s.mu.Unlock()
-		return fmt.Errorf("не удалось запустить SOCKS5-прокси: %w", err)
+		return fmt.Errorf(i18n.Text("failed to start the SOCKS5 proxy: %w", "не удалось запустить SOCKS5-прокси: %w"), err)
 	}
 	s.listener = listener
 	s.mu.Unlock()
-	s.logger.Infof("SOCKS5-прокси запущен на %s", listener.Addr())
+	s.logger.Infof(i18n.Text("SOCKS5 proxy is listening on %s", "SOCKS5-прокси запущен на %s"), listener.Addr())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			return fmt.Errorf("ошибка приёма SOCKS5-соединения: %w", err)
+			return fmt.Errorf(i18n.Text("failed to accept a SOCKS5 connection: %w", "ошибка приёма SOCKS5-соединения: %w"), err)
 		}
 		s.mu.Lock()
 		if s.closed {
@@ -125,7 +126,7 @@ func (s *SOCKS5OverSSH) handleConnection(conn net.Conn) {
 		return
 	}
 	_ = conn.SetDeadline(time.Time{})
-	s.logger.Infof("[SOCKS5] Установлено соединение с %s (правило: %s)", target, action)
+	s.logger.Infof(i18n.Text("[SOCKS5] Connected to %s (rule: %s)", "[SOCKS5] Установлено соединение с %s (правило: %s)"), target, action)
 	relay(conn, conn, dest, dest, s.logger)
 }
 
