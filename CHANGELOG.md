@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.2
+
+- Added first-connection host-key confirmation and automatic persistence to `known_hosts`, matching the familiar OpenSSH workflow while still rejecting changed or revoked keys.
+- Offered SSH keys, configured passwords, and keyboard-interactive authentication in a single handshake, avoiding duplicate connections and misleading authentication errors.
+- Made GNOME system-proxy integration opt-in instead of a startup requirement.
+- Changed missing or unusable `gsettings` handling to a warning so HTTP, SOCKS5, and SSH services keep running without desktop integration.
+- Kept the Linux release binaries statically linked; no new runtime dependency is required for the default proxy workflow.
+- Added regression coverage for first-use host keys, changed host keys, default system-proxy behavior, and missing `gsettings`.
+
 ## 1.0.1
 
 - Fixed SSH public-key authentication with explicitly selected identity files.

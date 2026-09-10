@@ -2,7 +2,7 @@
 
 [Русская документация](README.ru.md)
 
-**Version 1.0.1**
+**Version 1.0.2**
 
 `ssh-tun` is a Linux-only command-line network proxy that carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH. It supports SSH jump hosts, routing rules, subnet address mapping, GNOME proxy configuration, and systemd/OpenRC service installation.
 
@@ -15,16 +15,16 @@ Repository: <https://github.com/zukhovich/ssh-tun>
 - IPv4 TUN mode with TCP and DNS forwarding.
 - Direct, proxied, and rejected routes selected by YAML rules.
 - SSH jump-host chains.
-- Strict SSH host-key verification through `known_hosts`.
+- OpenSSH-style first-use host-key confirmation with strict mismatch detection.
 - English and Russian command-line interface.
 - Strict YAML application configuration.
-- GNOME system proxy setup with state restoration.
+- Optional GNOME system proxy setup with state restoration.
 - systemd and OpenRC service installation.
 - Static Linux binaries for `amd64` and `arm64`.
 
 ## Installation
 
-Install version 1.0.1 from GitHub Releases:
+Install version 1.0.2 from GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -34,7 +34,7 @@ Install into a custom directory:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.1 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.2 --install-dir "$HOME/bin"
 ```
 
 ## Build From Source
@@ -58,20 +58,21 @@ make package-release
 
 ## Quick Start
 
-Ensure the SSH host key is present before connecting:
+Connect directly; on first use, verify the displayed host-key fingerprint and answer `yes`. The accepted key is saved to `~/.ssh/known_hosts` automatically:
 
 ```sh
-ssh-keyscan example.com >> ~/.ssh/known_hosts
-ssh-tun user@example.com --http :8080 --socks5 :1080
+ssh-tun user@example.com --http 127.0.0.1:8080 --socks5 127.0.0.1:1080
 ```
 
 Use a specific private key with `-i`/`--identity-file`:
 
 ```sh
-ssh-tun user@example.com --identity-file ~/.ssh/id_ed25519 --sys-proxy=false
+ssh-tun user@example.com --identity-file ~/.ssh/id_ed25519
 ```
 
-When no identity file is specified, `ssh-tun` uses keys from `ssh-agent` and then tries standard unencrypted files in `~/.ssh`. Passphrase-protected identity files can be unlocked interactively, or loaded into `ssh-agent` for non-interactive use.
+When no identity file is specified, `ssh-tun` uses keys from `ssh-agent` and then tries standard unencrypted files in `~/.ssh`. Passphrase-protected identity files can be unlocked interactively, or loaded into `ssh-agent` for non-interactive use. Available key, password, and keyboard-interactive methods are offered in one SSH handshake.
+
+Desktop proxy configuration is disabled by default and is not required. Use `--sys-proxy` to enable GNOME integration. If `gsettings` is unavailable, ssh-tun logs a warning and keeps the local proxies running.
 
 Use the proxies:
 
@@ -116,7 +117,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-TUN mode requires root privileges and `iproute2`. Version 1.0.1 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
+TUN mode requires root privileges and `iproute2`. Version 1.0.2 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
 
 ## Language
 
@@ -148,7 +149,7 @@ Use `systemd` or `openrc` instead of `auto` to select a manager explicitly. A se
 
 ## Security
 
-- Host-key verification is enabled by default.
+- Host-key verification is enabled by default. Unknown keys require interactive confirmation; changed and revoked keys are rejected.
 - `--insecure-host-key` disables verification and is unsafe.
 - `--pass` exposes a password through process arguments; SSH keys are recommended.
 - Bind proxy listeners to loopback unless remote clients are intentionally allowed.

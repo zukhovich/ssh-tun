@@ -175,43 +175,53 @@ func NewSSHClient(cfg *config.Config, log *logger.Logger) (*SSHClient, error) {
 	return sshClient, nil
 }
 
-// connectToHost connects to a jump host or the final target.
+// connectToHost connects to a jump host or the final target. All available
+// authentication methods are offered in one SSH handshake. Interactive
+// password input is lazy, so a successful key never causes a password prompt.
 func connectToHost(cfg *config.Config, log *logger.Logger, user, addr string, jumpVia *ssh.Client) (*ssh.Client, error) {
-	// Stage 1: key authentication.
-	log.Debugf(i18n.Text("Stage 1: trying SSH key authentication for %s", "Этап 1: попытка аутентификации по SSH-ключу для %s"), addr)
+	var auths []ssh.AuthMethod
 	keyAuthCfg := &AuthConfig{User: user, ServerAddr: addr, KeyFile: cfg.SSHKeyFile, InteractiveAuth: cfg.InteractiveAuth}
-	keyAuths, cleanupKeyAuth, err := getAuthMethods(keyAuthCfg, log, false) // false selects key methods.
-	if err == nil && len(keyAuths) > 0 {
-		client, err := trySingleConnection(cfg, user, addr, cfg.Timeout, keyAuths, jumpVia)
-		cleanupKeyAuth()
-		if err == nil {
-			log.Debugf(i18n.Text("SSH key authentication succeeded: %s", "Аутентификация по SSH-ключу успешна: %s"), addr)
-			return client, nil
-		}
-		log.Warnf(i18n.Text("SSH key authentication failed: %v. Trying other methods...", "Аутентификация по SSH-ключу не удалась: %v. Попытка других методов..."), err)
-	} else if err != nil {
-		log.Debugf(i18n.Text("Failed to prepare SSH key authentication: %v", "Не удалось подготовить аутентификацию по SSH-ключу: %v"), err)
+	keyAuths, cleanupKeyAuth, keyErr := getAuthMethods(keyAuthCfg, log, false)
+	defer cleanupKeyAuth()
+	if keyErr == nil {
+		auths = append(auths, keyAuths...)
+	} else {
+		log.Debugf(i18n.Text("SSH key authentication is unavailable: %v", "Аутентификация по SSH-ключу недоступна: %v"), keyErr)
 	}
 
-	// Stage 2: password authentication after key authentication fails.
-	if cfg.InteractiveAuth || cfg.SSHPassword != "" {
-		log.Debugf(i18n.Text("Stage 2: trying SSH password authentication for %s", "Этап 2: попытка аутентификации по паролю SSH для %s"), addr)
-		passwordAuthCfg := &AuthConfig{User: user, ServerAddr: addr, Password: cfg.SSHPassword, InteractiveAuth: cfg.InteractiveAuth}
-		passwordAuths, cleanupPasswordAuth, err := getAuthMethods(passwordAuthCfg, log, true) // true selects password only.
-		if err == nil && len(passwordAuths) > 0 {
-			client, err := trySingleConnection(cfg, user, addr, cfg.Timeout, passwordAuths, jumpVia)
-			cleanupPasswordAuth()
-			if err == nil {
-				log.Debugf(i18n.Text("SSH password authentication succeeded: %s", "Аутентификация по паролю SSH успешна: %s"), addr)
-				return client, nil
-			}
-			log.Warnf(i18n.Text("SSH password authentication failed: %v", "Аутентификация по паролю SSH не удалась: %v"), err)
-		} else if err != nil {
-			log.Debugf(i18n.Text("Failed to prepare SSH password authentication: %v", "Не удалось подготовить аутентификацию по паролю SSH: %v"), err)
+	if cfg.SSHPassword != "" || cfg.InteractiveAuth {
+		var password string
+		var passwordErr error
+		var passwordOnce sync.Once
+		passwordProvider := func() (string, error) {
+			passwordOnce.Do(func() {
+				password, passwordErr = utils.GetSSHPassword(cfg.SSHPassword, cfg.InteractiveAuth, user, addr)
+			})
+			return password, passwordErr
 		}
+		auths = append(auths,
+			ssh.PasswordCallback(passwordProvider),
+			ssh.KeyboardInteractive(func(_, _ string, questions []string, _ []bool) ([]string, error) {
+				password, err := passwordProvider()
+				if err != nil {
+					return nil, err
+				}
+				answers := make([]string, len(questions))
+				for i := range answers {
+					answers[i] = password
+				}
+				return answers, nil
+			}),
+		)
 	}
 
-	return nil, errors.New(i18n.Text("all SSH authentication methods failed", "все методы аутентификации SSH завершились ошибкой"))
+	if len(auths) == 0 {
+		if keyErr != nil {
+			return nil, keyErr
+		}
+		return nil, errors.New(i18n.Text("no SSH authentication methods are available", "нет доступных методов SSH-аутентификации"))
+	}
+	return trySingleConnection(cfg, user, addr, cfg.Timeout, auths, jumpVia)
 }
 
 // trySingleConnection connects using the supplied authentication methods.
@@ -219,25 +229,105 @@ func hostKeyCallback(cfg *config.Config) (ssh.HostKeyCallback, error) {
 	if cfg.InsecureHostKey {
 		return ssh.InsecureIgnoreHostKey(), nil
 	}
-	path := cfg.KnownHostsFile
-	if path == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf(i18n.Text("failed to determine the home directory for known_hosts: %w", "не удалось определить домашний каталог для known_hosts: %w"), err)
-		}
-		path = filepath.Join(home, ".ssh", "known_hosts")
-	} else if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf(i18n.Text("failed to expand the known_hosts path: %w", "не удалось развернуть путь к known_hosts: %w"), err)
-		}
-		path = filepath.Join(home, path[2:])
+	path, err := knownHostsPath(cfg.KnownHostsFile)
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureKnownHostsFile(path); err != nil {
+		return nil, err
 	}
 	callback, err := knownhosts.New(path)
 	if err != nil {
 		return nil, fmt.Errorf(i18n.Text("failed to load known_hosts %q: %w", "не удалось загрузить known_hosts %q: %w"), path, err)
 	}
-	return callback, nil
+	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+		err := callback(hostname, remote, key)
+		if err == nil {
+			return nil
+		}
+		var keyErr *knownhosts.KeyError
+		if !errors.As(err, &keyErr) || len(keyErr.Want) != 0 {
+			return err
+		}
+		if !cfg.InteractiveAuth {
+			return fmt.Errorf(i18n.Text("SSH host key is unknown; add it to %s or use --insecure-host-key: %w", "ключ SSH-сервера неизвестен; добавьте его в %s или используйте --insecure-host-key: %w"), path, err)
+		}
+		accepted, promptErr := confirmHostKey(hostname, remote, key)
+		if promptErr != nil {
+			return promptErr
+		}
+		if !accepted {
+			return errors.New(i18n.Text("SSH host key was not accepted", "ключ SSH-сервера не принят"))
+		}
+		if err := appendKnownHost(path, hostname, key); err != nil {
+			return err
+		}
+		return nil
+	}, nil
+}
+
+func knownHostsPath(configured string) (string, error) {
+	path := configured
+	if path == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf(i18n.Text("failed to determine the home directory for known_hosts: %w", "не удалось определить домашний каталог для known_hosts: %w"), err)
+		}
+		return filepath.Join(home, ".ssh", "known_hosts"), nil
+	}
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf(i18n.Text("failed to expand the known_hosts path: %w", "не удалось развернуть путь к known_hosts: %w"), err)
+		}
+		path = filepath.Join(home, path[2:])
+	}
+	return path, nil
+}
+
+func ensureKnownHostsFile(path string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return fmt.Errorf(i18n.Text("failed to create the known_hosts directory: %w", "не удалось создать каталог known_hosts: %w"), err)
+	}
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND, 0600)
+	if err != nil {
+		return fmt.Errorf(i18n.Text("failed to create known_hosts %q: %w", "не удалось создать known_hosts %q: %w"), path, err)
+	}
+	return file.Close()
+}
+
+var (
+	confirmHostKey   = confirmUnknownHostKey
+	knownHostsFileMu sync.Mutex
+)
+
+func confirmUnknownHostKey(hostname string, remote net.Addr, key ssh.PublicKey) (bool, error) {
+	fmt.Fprintf(os.Stderr, i18n.Text(
+		"The authenticity of host '%s' (%s) cannot be established.\n%s key fingerprint is SHA256:%s.\nContinue connecting (yes/no)? ",
+		"Подлинность узла '%s' (%s) не установлена.\nОтпечаток ключа %s: SHA256:%s.\nПродолжить подключение (yes/no)? ",
+	), knownhosts.Normalize(hostname), remote.String(), key.Type(), ssh.FingerprintSHA256(key)[7:])
+	var answer string
+	if _, err := fmt.Fscanln(os.Stdin, &answer); err != nil {
+		return false, fmt.Errorf(i18n.Text("failed to read host-key confirmation: %w", "не удалось прочитать подтверждение ключа сервера: %w"), err)
+	}
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "yes" || answer == "y" || answer == "да" || answer == "д", nil
+}
+
+func appendKnownHost(path, hostname string, key ssh.PublicKey) error {
+	knownHostsFileMu.Lock()
+	defer knownHostsFileMu.Unlock()
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf(i18n.Text("failed to open known_hosts %q: %w", "не удалось открыть known_hosts %q: %w"), path, err)
+	}
+	defer file.Close()
+	address := knownhosts.Normalize(hostname)
+	line := knownhosts.Line([]string{knownhosts.HashHostname(address)}, key) + "\n"
+	if _, err := file.WriteString(line); err != nil {
+		return fmt.Errorf(i18n.Text("failed to save the SSH host key: %w", "не удалось сохранить ключ SSH-сервера: %w"), err)
+	}
+	return nil
 }
 
 func trySingleConnection(cfg *config.Config, user, addr string, timeout time.Duration, auths []ssh.AuthMethod, jumpVia *ssh.Client) (*ssh.Client, error) {

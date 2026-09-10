@@ -32,6 +32,12 @@ func TestParseSubnetAlias(t *testing.T) {
 	}
 }
 
+func TestSystemProxyIsOptIn(t *testing.T) {
+	if NewConfig().SystemProxy {
+		t.Fatal("system proxy integration must be disabled by default")
+	}
+}
+
 func TestValidateTimeoutAndAddresses(t *testing.T) {
 	cfg := NewConfig()
 	cfg.SSHServer = "example.com:22"

@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	Version        = "1.0.1"
+	Version        = "1.0.2"
 	cfg            = config.NewConfig()
 	aliasFlags     []string
 	configPath     string
@@ -272,17 +272,16 @@ var rootCmd = &cobra.Command{
 			}()
 		}
 
-		// Allow listeners to bind before changing desktop proxy settings.
-		time.Sleep(50 * time.Millisecond)
+		// Desktop integration is optional. A missing or unsupported gsettings
+		// environment must never stop the already running SSH proxies.
+		systemProxyEnabled := false
 		if cfg.SystemProxy && proxyMgr != nil {
 			if err := proxyMgr.Enable(); err != nil {
-				_ = httpProxy.Close()
-				if socksProxy != nil {
-					_ = socksProxy.Close()
-				}
-				return fmt.Errorf(i18n.Text("failed to configure the system proxy: %w", "не удалось настроить системный прокси: %w"), err)
+				log.Warnf(i18n.Text("System proxy integration is unavailable; continuing without it: %v", "Интеграция с системным прокси недоступна; работа продолжается без неё: %v"), err)
+			} else {
+				systemProxyEnabled = true
+				defer proxyMgr.Disable()
 			}
-			defer proxyMgr.Disable()
 		}
 
 		fmt.Println("\n" + i18n.T(i18n.Started) + ":")
@@ -299,7 +298,7 @@ var rootCmd = &cobra.Command{
 		} else {
 			fmt.Println(i18n.Text("Direct connection to SSH server:", "Прямое подключение к SSH-серверу:"), cfg.SSHServer)
 		}
-		if cfg.SystemProxy {
+		if systemProxyEnabled {
 			fmt.Println(i18n.Text("System proxy enabled", "Системный прокси включён"))
 		}
 		if cfg.RuleFile != "" {
@@ -310,7 +309,7 @@ var rootCmd = &cobra.Command{
 		<-sigChan
 		log.Info(i18n.Text("Shutdown signal received; closing proxy services...", "Получен сигнал, закрытие прокси-сервисов..."))
 
-		if cfg.SystemProxy && proxyMgr != nil {
+		if systemProxyEnabled && proxyMgr != nil {
 			if err := proxyMgr.Disable(); err != nil {
 				log.Errorf(i18n.Text("Failed to restore system proxy settings: %v", "Не удалось восстановить настройки системного прокси: %v"), err)
 			}
@@ -363,7 +362,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfg.ListenAddr, "listen", "l", ":8080", i18n.T(i18n.FlagListen))
 	rootCmd.PersistentFlags().StringVar(&cfg.ListenAddr, "http", ":8080", i18n.T(i18n.FlagHTTP))
 	rootCmd.PersistentFlags().StringVar(&cfg.SocksAddr, "socks5", "", i18n.T(i18n.FlagSOCKS))
-	rootCmd.PersistentFlags().BoolVar(&cfg.SystemProxy, "sys-proxy", true, i18n.T(i18n.FlagSysProxy))
+	rootCmd.PersistentFlags().BoolVar(&cfg.SystemProxy, "sys-proxy", false, i18n.T(i18n.FlagSysProxy))
 	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "http-upstream", "", i18n.T(i18n.FlagUpstream))
 	// Keep the legacy target option hidden for compatibility.
 	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "target", "", "Deprecated: use --http-upstream")

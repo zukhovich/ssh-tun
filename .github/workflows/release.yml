@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - "v1.0.1"
+      - "v*"
 
 permissions:
   contents: write
@@ -18,18 +18,27 @@ jobs:
           go-version: "1.25.5"
       - name: Test
         run: go test ./...
+      - name: Verify tag and source version
+        shell: bash
+        run: |
+          source_version=$(awk '/^VERSION := / { print $3 }' Makefile)
+          test "${GITHUB_REF_NAME}" = "v${source_version}"
       - name: Build release archives
         run: make package-release
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           body: |
-            - Fixed SSH public-key authentication with explicitly selected identity files.
-            - Added support for SSH agent keys and interactive unlocking of passphrase-protected identity files.
-            - Added the conventional `--identity-file` option while preserving `--identity_file` compatibility.
-            - Defaulted no-configuration startup and logs to English regardless of the system locale.
-            - Added end-to-end SSH key authentication coverage and revalidated the existing test suite.
+            ## ssh-tun 1.0.2
+
+            - Added OpenSSH-style host-key confirmation on first connection and automatic persistence to `known_hosts`.
+            - Kept strict protection against changed and revoked SSH host keys.
+            - Combined key, password, and keyboard-interactive authentication into one SSH handshake.
+            - Made GNOME system-proxy integration opt-in and non-fatal when `gsettings` is missing or unusable.
+            - Kept the default proxy workflow free of optional desktop runtime dependencies.
+            - Added regression tests for first-use host keys, key mismatches, system-proxy defaults, and missing `gsettings`.
           files: |
-            build/ssh-tun_1.0.1_linux_amd64.tar.gz
-            build/ssh-tun_1.0.1_linux_arm64.tar.gz
+            build/ssh-tun_*_linux_amd64.tar.gz
+            build/ssh-tun_*_linux_arm64.tar.gz
             build/SHA256SUMS

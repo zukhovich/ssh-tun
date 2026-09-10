@@ -8,10 +8,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 
 	"github.com/zukhovich/ssh-tun/internal/config"
 	"github.com/zukhovich/ssh-tun/internal/i18n"
@@ -33,6 +35,96 @@ func TestLoadPassphraseProtectedPrivateKey(t *testing.T) {
 	}
 	if _, err := loadPrivateKey(keyPath, false); err == nil {
 		t.Fatal("loadPrivateKey() accepted a protected key without interactive authentication")
+	}
+}
+
+func TestUnknownHostKeyIsAcceptedAndPersisted(t *testing.T) {
+	_, hostPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hostKey, err := ssh.NewPublicKey(hostPrivateKey.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	knownHostsPath := filepath.Join(t.TempDir(), ".ssh", "known_hosts")
+	cfg := config.NewConfig()
+	cfg.KnownHostsFile = knownHostsPath
+	cfg.InteractiveAuth = true
+
+	originalConfirm := confirmHostKey
+	confirmHostKey = func(string, net.Addr, ssh.PublicKey) (bool, error) { return true, nil }
+	t.Cleanup(func() { confirmHostKey = originalConfirm })
+
+	callback, err := hostKeyCallback(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 22}
+	if err := callback("example.com:22", addr, hostKey); err != nil {
+		t.Fatalf("first host-key check failed: %v", err)
+	}
+	contents, err := os.ReadFile(knownHostsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(contents), hostKey.Type()) {
+		t.Fatalf("known_hosts does not contain the accepted key: %q", contents)
+	}
+
+	confirmHostKey = func(string, net.Addr, ssh.PublicKey) (bool, error) {
+		t.Fatal("a persisted host key must not prompt again")
+		return false, nil
+	}
+	callback, err = hostKeyCallback(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := callback("example.com:22", addr, hostKey); err != nil {
+		t.Fatalf("persisted host-key check failed: %v", err)
+	}
+}
+
+func TestChangedHostKeyIsRejectedWithoutPrompt(t *testing.T) {
+	_, firstPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstKey, err := ssh.NewPublicKey(firstPrivateKey.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, changedPrivateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedKey, err := ssh.NewPublicKey(changedPrivateKey.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	knownHostsPath := filepath.Join(t.TempDir(), "known_hosts")
+	line := knownhosts.Line([]string{"example.com"}, firstKey) + "\n"
+	if err := os.WriteFile(knownHostsPath, []byte(line), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.NewConfig()
+	cfg.KnownHostsFile = knownHostsPath
+	cfg.InteractiveAuth = true
+
+	originalConfirm := confirmHostKey
+	confirmHostKey = func(string, net.Addr, ssh.PublicKey) (bool, error) {
+		t.Fatal("a changed host key must never prompt for acceptance")
+		return false, nil
+	}
+	t.Cleanup(func() { confirmHostKey = originalConfirm })
+
+	callback, err := hostKeyCallback(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := &net.TCPAddr{IP: net.ParseIP("192.0.2.1"), Port: 22}
+	if err := callback("example.com:22", addr, changedKey); err == nil || !strings.Contains(err.Error(), "mismatch") {
+		t.Fatalf("expected host-key mismatch, got %v", err)
 	}
 }
 

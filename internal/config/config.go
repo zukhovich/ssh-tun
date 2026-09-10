@@ -58,7 +58,7 @@ func NewConfig() *Config {
 		Timeout:         10 * time.Second,
 		Verbose:         false,
 		InteractiveAuth: true,
-		SystemProxy:     true,
+		SystemProxy:     false,
 		RuleFile:        "",
 		SocksAddr:       "",
 		TunMode:         false,
