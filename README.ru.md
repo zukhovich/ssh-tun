@@ -2,7 +2,7 @@
 
 [English documentation](README.md)
 
-**Версия 1.0.2**
+**Версия 1.0.3**
 
 `ssh-tun` — сетевой прокси для Linux, который передаёт HTTP, HTTPS CONNECT, SOCKS5 и TUN-трафик через SSH. Поддерживаются промежуточные SSH-узлы, правила маршрутизации, отображение подсетей, настройка прокси GNOME и установка службы systemd/OpenRC.
 
@@ -24,7 +24,7 @@
 
 ## Установка
 
-Установка версии 1.0.2 из GitHub Releases:
+Установка версии 1.0.3 из GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/inst
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.2 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.3 --install-dir "$HOME/bin"
 ```
 
 ## Сборка
@@ -117,7 +117,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-Нужны права root и `iproute2`. Версия 1.0.2 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
+Нужны права root и `iproute2`. Версия 1.0.3 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
 
 ## Язык
 

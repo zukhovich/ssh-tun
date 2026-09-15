@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
-# ssh-tun 1.0.2 installer for Linux.
+# ssh-tun 1.0.3 installer for Linux.
 
 set -eu
 
 REPOSITORY="zukhovich/ssh-tun"
-VERSION="${SSH_TUN_VERSION:-1.0.2}"
+VERSION="${SSH_TUN_VERSION:-1.0.3}"
 INSTALL_DIR="${SSH_TUN_INSTALL_DIR:-${HOME}/.local/bin}"
 BINARY="ssh-tun"
 INSTALL_COMPLETIONS=1
@@ -19,7 +19,7 @@ while [ $# -gt 0 ]; do
     --install-dir) [ $# -ge 2 ] || fail "--install-dir requires a value"; INSTALL_DIR="$2"; shift 2 ;;
     --no-completions) INSTALL_COMPLETIONS=0; shift ;;
     -h|--help)
-      printf '%s\n' 'Usage: install.sh [--version 1.0.2] [--install-dir DIR] [--no-completions]'
+      printf '%s\n' 'Usage: install.sh [--version 1.0.3] [--install-dir DIR] [--no-completions]'
       exit 0
       ;;
     *) fail "Unknown option: $1" ;;

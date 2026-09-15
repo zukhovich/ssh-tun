@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.3
+
+- Added cross-compilation support and release packaging scripts for Windows (amd64 and arm64) alongside Linux binaries.
+- Updated documentation and installation scripts to reference version 1.0.3.
+- Improved Makefile targets and automated binary testing workflow.
+
 ## 1.0.2
 
 - Added first-connection host-key confirmation and automatic persistence to `known_hosts`, matching the familiar OpenSSH workflow while still rejecting changed or revoked keys.
