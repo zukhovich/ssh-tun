@@ -74,7 +74,9 @@ func NewRouter(path string) (*Router, error) {
 	}
 
 	var cfg routerConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&cfg); err != nil {
 		return nil, fmt.Errorf(i18n.Text("failed to parse the YAML routing rules file: %w", "не удалось разобрать YAML-файл правил маршрутизации: %w"), err)
 	}
 
@@ -107,7 +109,11 @@ func NewRouter(path string) (*Router, error) {
 		default:
 			return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an unknown rule type: %s", "строка %d файла правил содержит неизвестный тип правила: %s"), i+1, parts[0])
 		}
-		if ruleType != Match && parts[1] == "" {
+		if ruleType == Match {
+			if len(parts) != 3 || parts[1] != "" {
+				return nil, fmt.Errorf(i18n.Text("routing rules line %d must use MATCH,,ACTION", "строка %d файла правил должна иметь формат MATCH,,ДЕЙСТВИЕ"), i+1)
+			}
+		} else if parts[1] == "" {
 			return nil, fmt.Errorf(i18n.Text("routing rules line %d contains an empty value", "строка %d файла правил содержит пустое значение"), i+1)
 		}
 

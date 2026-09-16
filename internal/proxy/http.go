@@ -32,6 +32,9 @@ type HTTPOverSSH struct {
 	listener    net.Listener
 	activeConns map[net.Conn]struct{}
 	closed      bool
+	started     chan struct{}
+	startErr    error
+	startOnce   sync.Once
 }
 
 func NewHTTPOverSSH(cfg *config.Config, log *logger.Logger, sshClient *SSHClient, r *router.Router) (*HTTPOverSSH, error) {
@@ -42,6 +45,7 @@ func NewHTTPOverSSH(cfg *config.Config, log *logger.Logger, sshClient *SSHClient
 		logger:      log,
 		router:      r,
 		activeConns: make(map[net.Conn]struct{}),
+		started:     make(chan struct{}),
 	}
 	p.transport = &http.Transport{
 		Proxy:                 nil,
@@ -60,20 +64,37 @@ func NewHTTPOverSSH(cfg *config.Config, log *logger.Logger, sshClient *SSHClient
 	return p, nil
 }
 
+// Ready waits until the listener has opened or startup has failed.
+func (p *HTTPOverSSH) Ready() error {
+	<-p.started
+	return p.startErr
+}
+
+func (p *HTTPOverSSH) signalStarted(err error) {
+	p.startOnce.Do(func() {
+		p.startErr = err
+		close(p.started)
+	})
+}
+
 // Start opens the listener before serving so startup errors are synchronous.
 func (p *HTTPOverSSH) Start() error {
 	p.mu.Lock()
 	if p.closed {
 		p.mu.Unlock()
+		p.signalStarted(net.ErrClosed)
 		return net.ErrClosed
 	}
 	listener, err := net.Listen("tcp", p.cfg.ListenAddr)
 	if err != nil {
 		p.mu.Unlock()
-		return fmt.Errorf(i18n.Text("failed to start the HTTP proxy: %w", "не удалось запустить HTTP-прокси: %w"), err)
+		err = fmt.Errorf(i18n.Text("failed to start the HTTP proxy: %w", "не удалось запустить HTTP-прокси: %w"), err)
+		p.signalStarted(err)
+		return err
 	}
 	p.listener = listener
 	p.mu.Unlock()
+	p.signalStarted(nil)
 	p.logger.Infof(i18n.Text("HTTP/HTTPS proxy is listening on %s", "HTTP/HTTPS-прокси запущен на %s"), listener.Addr())
 	err = p.server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
@@ -120,6 +141,10 @@ func (p *HTTPOverSSH) handlePlainHTTP(w http.ResponseWriter, req *http.Request) 
 	target = addressWithDefaultPort(target, "80")
 	ctx, cancel := context.WithTimeout(req.Context(), p.cfg.Timeout)
 	defer cancel()
+	if p.ssh == nil {
+		http.Error(w, "SSH-клиент не готов", http.StatusBadGateway)
+		return
+	}
 	conn, err := p.ssh.DialContext(ctx, "tcp", target)
 	if err != nil {
 		http.Error(w, "Не удалось подключиться к цели через SSH", http.StatusBadGateway)
@@ -187,6 +212,10 @@ func (p *HTTPOverSSH) handleConnect(w http.ResponseWriter, req *http.Request) {
 	if action == router.ActionDirect {
 		upstream, err = (&net.Dialer{Timeout: p.cfg.Timeout}).DialContext(ctx, "tcp", target)
 	} else {
+		if p.ssh == nil {
+			http.Error(w, "SSH-клиент не готов", http.StatusBadGateway)
+			return
+		}
 		upstream, err = p.ssh.DialContext(ctx, "tcp", target)
 	}
 	if err != nil {

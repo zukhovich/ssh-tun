@@ -1,0 +1,47 @@
+# Linux configuration template for ssh-tun 1.x.
+# Copy to ~/.config/ssh-tun/config.yaml for a user process, or to
+# /etc/ssh-tun/config.yaml for a systemd/OpenRC service (chmod 600).
+version: 1
+language: en
+
+ssh:
+  target: user@example.com
+  port: "22"
+  password: ""                 # Never commit real passwords or tokens.
+  identity_file: "~/.ssh/id_ed25519"
+  known_hosts: "~/.ssh/known_hosts"
+  insecure_host_key: false
+  interactive_auth: false      # Required for unattended services.
+  jump_hosts: []
+  timeout: 10s
+  auto_reconnect: true
+  reconnect_interval: 5s
+  keepalive_interval: 15s
+
+proxy:
+  http: "127.0.0.1:8080"
+  socks5: "127.0.0.1:1080"
+  http_upstream: ""
+  system: false                # GNOME user sessions only; disable in services.
+
+tun:
+  enabled: false
+  global: false
+  cidr: "10.0.0.1/24"
+  routes: []
+  nat: []
+
+routing:
+  rules_file: "/etc/ssh-tun/rules.yaml"
+
+logging:
+  verbose: false
+  file: "/var/log/ssh-tun/ssh-tun.log"
+
+service:
+  manager: auto                # auto, systemd, or openrc
+  name: ssh-tun
+  user: root
+  group: root
+  enable: true
+  start: true

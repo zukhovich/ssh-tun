@@ -4,7 +4,7 @@
 
 **Version 1.0.3**
 
-`ssh-tun` is a Linux-only command-line network proxy that carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH. It supports SSH jump hosts, routing rules, subnet address mapping, GNOME proxy configuration, and systemd/OpenRC service installation.
+`ssh-tun` is a self-contained command-line network proxy for Linux and Windows. It carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH and supports jump hosts, routing rules, subnet mapping, automatic reconnection, native service installation, and OS-aware configuration templates.
 
 Repository: <https://github.com/zukhovich/ssh-tun>
 
@@ -19,8 +19,10 @@ Repository: <https://github.com/zukhovich/ssh-tun>
 - English and Russian command-line interface.
 - Strict YAML application configuration.
 - Optional GNOME system proxy setup with state restoration.
-- systemd and OpenRC service installation.
-- Static Linux binaries for `amd64` and `arm64`.
+- Native systemd, OpenRC, and Windows Service installation.
+- OS-aware configuration template generation.
+- Automatic SSH channel monitoring and reconnection.
+- Static Linux and standalone Windows binaries for `amd64` and `arm64`.
 
 ## Installation
 
@@ -48,7 +50,7 @@ make test vet build
 file build/ssh-tun
 ```
 
-The output is `build/ssh-tun`, built with `CGO_ENABLED=0` as a stripped, statically linked Linux executable.
+The main output is `build/ssh-tun`, a stripped, statically linked Linux executable. Release packaging also produces standalone Linux and Windows binaries for `amd64` and `arm64`.
 
 Create release archives and checksums:
 
@@ -83,11 +85,13 @@ curl --proxy socks5h://127.0.0.1:1080 https://example.org
 
 ## Configuration
 
-Generate the complete template:
+Generate a template tailored to the current operating system (`~/.ssh` paths on Linux, `%USERPROFILE%`/`%PROGRAMDATA%` paths on Windows):
 
 ```sh
 ssh-tun --write-config ./ssh-tun.yaml
 ```
+
+Ready-to-copy Linux examples are also provided in [`configs/linux/config.yaml`](configs/linux/config.yaml) and [`configs/linux/rules.yaml`](configs/linux/rules.yaml).
 
 Run with it:
 
@@ -117,7 +121,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-TUN mode requires root privileges and `iproute2`. Version 1.0.3 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
+Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode requires an elevated Administrator console. Version 1.0.3 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
 
 ## Language
 
@@ -128,7 +132,18 @@ ssh-tun --lang ru --help
 
 The `language` YAML field accepts `en` or `ru`. Without a configuration file or `--lang`, English is used by default regardless of the system locale.
 
-## systemd and OpenRC
+## Automatic Reconnection
+
+Enable SSH channel monitoring and automatic reconnection without restarting the local HTTP/SOCKS listeners:
+
+```sh
+ssh-tun user@example.com --auto-reconnect \
+  --keepalive-interval 15s --reconnect-interval 5s
+```
+
+The same settings are available as `ssh.auto_reconnect`, `ssh.keepalive_interval`, and `ssh.reconnect_interval` in YAML.
+
+## systemd, OpenRC, and Windows services
 
 Create a permanent configuration first:
 
@@ -138,17 +153,18 @@ sudo ssh-tun --write-config /etc/ssh-tun/config.yaml
 sudo chmod 600 /etc/ssh-tun/config.yaml
 ```
 
-Install or remove a service:
+Install or remove a native service selected automatically for the current OS:
 
 ```sh
-sudo ssh-tun --config /etc/ssh-tun/config.yaml --install-service auto
-sudo ssh-tun --config /etc/ssh-tun/config.yaml --remove-service auto
+ssh-tun --config /path/to/config.yaml --install-service auto
+ssh-tun --config /path/to/config.yaml --remove-service auto
 ```
 
-Use `systemd` or `openrc` instead of `auto` to select a manager explicitly. A service must use non-interactive SSH authentication. GNOME `--sys-proxy` is intended for an interactive desktop session and normally should be disabled in a root service.
+On Linux, `auto` selects systemd or OpenRC. On Windows it creates/removes a Windows Service through `sc.exe`; run the console as Administrator. Linux service operations require root. A service must use non-interactive SSH authentication. GNOME `--sys-proxy` is intended for an interactive desktop session and normally should be disabled in a service.
 
 ## Security
 
+- Never commit private keys, passwords, tokens, generated `known_hosts`, or real production configuration files.
 - Host-key verification is enabled by default. Unknown keys require interactive confirmation; changed and revoked keys are rejected.
 - `--insecure-host-key` disables verification and is unsafe.
 - `--pass` exposes a password through process arguments; SSH keys are recommended.

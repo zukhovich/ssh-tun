@@ -1,3 +1,5 @@
+//go:build !windows
+
 package service
 
 import (
@@ -18,7 +20,16 @@ func TestRenderServices(t *testing.T) {
 }
 
 func TestValidServiceName(t *testing.T) {
-	if !validName.MatchString("ssh-tun@office") || validName.MatchString("../ssh-tun") {
+	if !validServiceName("ssh-tun@office") || validServiceName("../ssh-tun") {
 		t.Fatal("service name validation failed")
+	}
+	if !validAccountName("ssh-tun") || validAccountName("root:wheel") {
+		t.Fatal("service account validation failed")
+	}
+}
+
+func TestSystemdEscape(t *testing.T) {
+	if got := systemdEscape(`/opt/ssh tun/%i`); got != `/opt/ssh\x20tun/%%i` {
+		t.Fatalf("systemdEscape() = %q", got)
 	}
 }

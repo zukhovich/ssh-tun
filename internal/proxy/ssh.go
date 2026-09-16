@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -29,6 +30,7 @@ type SSHClient struct {
 	logger      *logger.Logger
 	mu          sync.RWMutex
 	closed      bool
+	broken      atomic.Bool
 }
 
 type AuthConfig struct {
@@ -173,6 +175,22 @@ func NewSSHClient(cfg *config.Config, log *logger.Logger) (*SSHClient, error) {
 	sshClient.client = finalClient
 	log.Infof(i18n.Text("Connected to the target SSH server: %s", "Подключено к целевому SSH-серверу: %s"), cfg.SSHServer)
 	return sshClient, nil
+}
+
+// watchChannel marks the client as broken when the SSH transport shuts down.
+func (s *SSHClient) watchChannel() {
+	client := s.client
+	go func() {
+		_ = client.Wait()
+		s.broken.Store(true)
+	}()
+}
+
+// disconnected reports whether the SSH channel has failed.
+func (s *SSHClient) disconnected() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.closed || s.broken.Load() || s.client == nil
 }
 
 // connectToHost connects to a jump host or the final target. All available
@@ -352,20 +370,73 @@ func trySingleConnection(cfg *config.Config, user, addr string, timeout time.Dur
 	if err != nil {
 		return nil, fmt.Errorf(i18n.Text("failed to connect to %s through an SSH jump host: %w", "не удалось подключиться к %s через промежуточный SSH-узел: %w"), addr, err)
 	}
-	if err := conn.SetDeadline(time.Now().Add(timeout)); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf(i18n.Text("failed to set the SSH connection deadline: %w", "не удалось установить таймаут SSH-соединения: %w"), err)
-	}
 	c, chans, reqs, err := ssh.NewClientConn(conn, addr, sshConfig)
 	if err != nil {
 		conn.Close()
 		return nil, fmt.Errorf(i18n.Text("failed to establish an SSH connection to %s through a jump host: %w", "не удалось установить SSH-подключение к %s через промежуточный SSH-узел: %w"), addr, err)
 	}
-	if err := conn.SetDeadline(time.Time{}); err != nil {
-		c.Close()
-		return nil, fmt.Errorf(i18n.Text("failed to clear the SSH connection deadline: %w", "не удалось сбросить таймаут SSH-соединения: %w"), err)
-	}
 	return ssh.NewClient(c, chans, reqs), nil
+}
+
+// keepAlive verifies that the transport still exchanges SSH packets.
+func (s *SSHClient) keepAlive(timeout time.Duration) bool {
+	s.mu.RLock()
+	client := s.client
+	closed := s.closed
+	s.mu.RUnlock()
+	if closed || client == nil || s.broken.Load() {
+		return false
+	}
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+		result <- err
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case err := <-result:
+		if err != nil {
+			s.broken.Store(true)
+			return false
+		}
+		return true
+	case <-timer.C:
+		s.broken.Store(true)
+		return false
+	}
+}
+
+// replaceFrom swaps the transport in place so existing proxies observe the
+// replacement without rebuilding their listeners.
+func (s *SSHClient) replaceFrom(replacement *SSHClient) error {
+	if replacement == nil || replacement.client == nil {
+		return errors.New(i18n.Text("replacement SSH client is not ready", "замещающий SSH-клиент не готов"))
+	}
+	s.mu.Lock()
+	if s.closed {
+		s.mu.Unlock()
+		_ = replacement.Close()
+		return errors.New(i18n.Text("SSH client is closed", "SSH-клиент закрыт"))
+	}
+	oldClient := s.client
+	oldJumps := s.jumpClients
+	s.client = replacement.client
+	s.jumpClients = replacement.jumpClients
+	s.broken.Store(false)
+	s.mu.Unlock()
+	if oldClient != nil {
+		_ = oldClient.Close()
+	}
+	for _, jump := range oldJumps {
+		if jump != nil {
+			_ = jump.Close()
+		}
+	}
+	replacement.client = nil
+	replacement.jumpClients = nil
+	_ = replacement.Close()
+	return nil
 }
 
 // Close closes all SSH connections in reverse order.

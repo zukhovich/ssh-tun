@@ -12,6 +12,9 @@ func TestParseSSHTarget(t *testing.T) {
 	if err != nil || user != "alice" || host != "[2001:db8::1]" {
 		t.Fatalf("parseSSHTarget = %q, %q, %v", user, host, err)
 	}
+	if _, _, err := parseSSHTarget("alice@@example.com"); err == nil {
+		t.Fatal("multiple @ separators must be rejected")
+	}
 }
 
 func TestBootstrapLanguageDefaultsToEnglish(t *testing.T) {
@@ -47,5 +50,8 @@ func TestAddressWithDefaultPort(t *testing.T) {
 		if err != nil || got != want {
 			t.Errorf("addressWithDefaultPort(%q) = %q, %v; want %q", input, got, err, want)
 		}
+	}
+	if _, err := addressWithDefaultPort("example.com:70000", "22"); err == nil {
+		t.Fatal("invalid explicit port must be rejected")
 	}
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -12,15 +13,18 @@ type File struct {
 	Version  int    `yaml:"version"`
 	Language string `yaml:"language"`
 	SSH      struct {
-		Target          string   `yaml:"target"`
-		Port            string   `yaml:"port"`
-		Password        string   `yaml:"password"`
-		IdentityFile    string   `yaml:"identity_file"`
-		KnownHosts      string   `yaml:"known_hosts"`
-		InsecureHostKey bool     `yaml:"insecure_host_key"`
-		InteractiveAuth *bool    `yaml:"interactive_auth"`
-		JumpHosts       []string `yaml:"jump_hosts"`
-		Timeout         string   `yaml:"timeout"`
+		Target            string   `yaml:"target"`
+		Port              string   `yaml:"port"`
+		Password          string   `yaml:"password"`
+		IdentityFile      string   `yaml:"identity_file"`
+		KnownHosts        string   `yaml:"known_hosts"`
+		InsecureHostKey   bool     `yaml:"insecure_host_key"`
+		InteractiveAuth   *bool    `yaml:"interactive_auth"`
+		JumpHosts         []string `yaml:"jump_hosts"`
+		Timeout           string   `yaml:"timeout"`
+		AutoReconnect     *bool    `yaml:"auto_reconnect"`
+		ReconnectInterval string   `yaml:"reconnect_interval"`
+		KeepAliveInterval string   `yaml:"keepalive_interval"`
 	} `yaml:"ssh"`
 	Proxy struct {
 		HTTP         string `yaml:"http"`
@@ -47,8 +51,8 @@ type File struct {
 		Name    string `yaml:"name"`
 		User    string `yaml:"user"`
 		Group   string `yaml:"group"`
-		Enable  bool   `yaml:"enable"`
-		Start   bool   `yaml:"start"`
+		Enable  *bool  `yaml:"enable"`
+		Start   *bool  `yaml:"start"`
 	} `yaml:"service"`
 }
 
@@ -62,6 +66,12 @@ func LoadFile(path string) (*Config, string, []string, error) {
 	decoder := yaml.NewDecoder(input)
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&file); err != nil {
+		return nil, "", nil, fmt.Errorf("decode configuration: %w", err)
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err == nil {
+		return nil, "", nil, fmt.Errorf("decode configuration: multiple YAML documents are not allowed")
+	} else if err != io.EOF {
 		return nil, "", nil, fmt.Errorf("decode configuration: %w", err)
 	}
 	if file.Version != 0 && file.Version != 1 {
@@ -81,6 +91,21 @@ func LoadFile(path string) (*Config, string, []string, error) {
 		cfg.Timeout, err = time.ParseDuration(file.SSH.Timeout)
 		if err != nil {
 			return nil, "", nil, fmt.Errorf("invalid ssh.timeout: %w", err)
+		}
+	}
+	if file.SSH.AutoReconnect != nil {
+		cfg.AutoReconnect = *file.SSH.AutoReconnect
+	}
+	if file.SSH.ReconnectInterval != "" {
+		cfg.ReconnectInterval, err = time.ParseDuration(file.SSH.ReconnectInterval)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("invalid ssh.reconnect_interval: %w", err)
+		}
+	}
+	if file.SSH.KeepAliveInterval != "" {
+		cfg.KeepAliveInterval, err = time.ParseDuration(file.SSH.KeepAliveInterval)
+		if err != nil {
+			return nil, "", nil, fmt.Errorf("invalid ssh.keepalive_interval: %w", err)
 		}
 	}
 	if file.Proxy.HTTP != "" {
@@ -108,23 +133,40 @@ func LoadFile(path string) (*Config, string, []string, error) {
 	if file.Service.Group != "" {
 		cfg.ServiceGroup = file.Service.Group
 	}
-	cfg.ServiceEnable, cfg.ServiceStart = file.Service.Enable, file.Service.Start
+	if file.Service.Enable != nil {
+		cfg.ServiceEnable = *file.Service.Enable
+	}
+	if file.Service.Start != nil {
+		cfg.ServiceStart = *file.Service.Start
+	}
 	return cfg, file.Language, file.TUN.NAT, nil
 }
 
-const Template = `version: 1
+// Template returns a complete configuration template for the current OS.
+func Template(goos string) string {
+	identity, knownHosts, logFile, user, group := "~/.ssh/id_ed25519", "~/.ssh/known_hosts", "", "root", "root"
+	if goos == "windows" {
+		identity, knownHosts, logFile, user, group = `${USERPROFILE}\.ssh\id_ed25519`, `${USERPROFILE}\.ssh\known_hosts`, `${PROGRAMDATA}\ssh-tun\ssh-tun.log`, "SYSTEM", "SYSTEM"
+	}
+	return fmt.Sprintf(template, identity, knownHosts, logFile, user, group)
+}
+
+const template = `version: 1
 language: en
 
 ssh:
   target: user@example.com
   port: "22"
   password: ""
-  identity_file: ""
-  known_hosts: "~/.ssh/known_hosts"
+  identity_file: '%s'
+  known_hosts: '%s'
   insecure_host_key: false
   interactive_auth: true
   jump_hosts: []
   timeout: 10s
+  auto_reconnect: false
+  reconnect_interval: 5s
+  keepalive_interval: 15s
 
 proxy:
   http: ":8080"
@@ -144,13 +186,13 @@ routing:
 
 logging:
   verbose: false
-  file: ""
+  file: '%s'
 
 service:
   manager: auto
   name: ssh-tun
-  user: root
-  group: root
+  user: %s
+  group: %s
   enable: true
   start: true
 `

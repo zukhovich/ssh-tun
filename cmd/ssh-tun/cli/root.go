@@ -6,6 +6,8 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -49,11 +51,15 @@ var rootCmd = &cobra.Command{
 			return err
 		}
 		if writeConfig != "" {
+			template := config.Template(runtime.GOOS)
 			if writeConfig == "-" {
-				fmt.Print(config.Template)
+				fmt.Print(template)
 				return nil
 			}
-			if err := os.WriteFile(writeConfig, []byte(config.Template), 0600); err != nil {
+			if err := os.MkdirAll(filepath.Dir(writeConfig), 0700); err != nil {
+				return fmt.Errorf("create configuration directory: %w", err)
+			}
+			if err := os.WriteFile(writeConfig, []byte(template), 0600); err != nil {
 				return fmt.Errorf("write configuration template: %w", err)
 			}
 			return nil
@@ -132,22 +138,12 @@ var rootCmd = &cobra.Command{
 			cfg.TunMode = true
 		}
 
-		// Creating a TUN device and routes requires root privileges.
-		if cfg.TunMode && os.Geteuid() != 0 {
-			fmt.Println(i18n.Text("TUN mode requires root privileges. Restarting with sudo...", "Для TUN-режима нужны права root. Перезапуск через sudo..."))
-
-			exe, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf(i18n.Text("failed to get executable path: %w", "не удалось получить путь к исполняемому файлу: %w"), err)
+		if needsElevation(cfg.TunMode) {
+			fmt.Println(i18n.Text("TUN mode requires elevated privileges. Restarting...", "Для TUN-режима нужны повышенные привилегии. Перезапуск..."))
+			if err := relaunchElevated(); err != nil {
+				return err
 			}
-
-			sudoArgs := []string{"sudo", exe}
-			sudoArgs = append(sudoArgs, os.Args[1:]...)
-
-			if err := syscall.Exec("/usr/bin/sudo", sudoArgs, os.Environ()); err != nil {
-				return fmt.Errorf(i18n.Text("failed to restart the application with sudo: %w", "не удалось перезапустить приложение через sudo: %w"), err)
-			}
-			return nil // syscall.Exec does not return on success.
+			return nil
 		}
 
 		// Resolve the SSH user and server from CLI or configuration.
@@ -209,12 +205,13 @@ var rootCmd = &cobra.Command{
 			log.Infof(i18n.Text("Loaded routing rules file: %s", "Загружен файл правил маршрутизации: %s"), cfg.RuleFile)
 		}
 
-		// Initialize the SSH client.
-		sshClient, err := proxy.NewSSHClient(cfg, log)
+		// Initialize the SSH connection with optional auto-reconnect.
+		supervisor, err := proxy.NewSupervisor(cfg, log)
 		if err != nil {
 			return fmt.Errorf(i18n.Text("SSH connection error: %w", "ошибка SSH-подключения: %w"), err)
 		}
-		defer sshClient.Close()
+		defer supervisor.Close()
+		sshClient := supervisor.SSH()
 
 		// Initialize the HTTP proxy.
 		httpProxy, err := proxy.NewHTTPOverSSH(cfg, log, sshClient, r)
@@ -257,19 +254,30 @@ var rootCmd = &cobra.Command{
 		signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 		go func() {
-			if err := httpProxy.Start(); err != nil {
-				log.Errorf(i18n.Text("Failed to start the HTTP proxy: %v", "Не удалось запустить HTTP-прокси: %v"), err)
-				sigChan <- syscall.SIGTERM
+			if err := httpProxy.Start(); err != nil && !errors.Is(err, net.ErrClosed) {
+				select {
+				case sigChan <- syscall.SIGTERM:
+				default:
+				}
 			}
 		}()
+		if err := httpProxy.Ready(); err != nil {
+			return err
+		}
 
 		if socksProxy != nil {
 			go func() {
-				if err := socksProxy.Start(); err != nil {
-					log.Errorf(i18n.Text("Failed to start the SOCKS5 proxy: %v", "Не удалось запустить SOCKS5-прокси: %v"), err)
-					sigChan <- syscall.SIGTERM
+				if err := socksProxy.Start(); err != nil && !errors.Is(err, net.ErrClosed) {
+					select {
+					case sigChan <- syscall.SIGTERM:
+					default:
+					}
 				}
 			}()
+			if err := socksProxy.Ready(); err != nil {
+				_ = httpProxy.Close()
+				return err
+			}
 		}
 
 		// Desktop integration is optional. A missing or unsupported gsettings
@@ -303,6 +311,9 @@ var rootCmd = &cobra.Command{
 		}
 		if cfg.RuleFile != "" {
 			fmt.Println(i18n.Text("Custom routing rules enabled:", "Пользовательские правила маршрутизации включены:"), cfg.RuleFile)
+		}
+		if cfg.AutoReconnect {
+			fmt.Println(i18n.Text("Auto-reconnect enabled", "Автоматическое переподключение включено"))
 		}
 		fmt.Println(i18n.T(i18n.PressExit))
 
@@ -357,6 +368,9 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&cfg.InsecureHostKey, "insecure-host-key", false, i18n.T(i18n.FlagInsecure))
 	rootCmd.PersistentFlags().StringSliceVarP(&cfg.JumpHosts, "jump", "J", []string{}, i18n.T(i18n.FlagJump))
 	rootCmd.PersistentFlags().DurationVar(&cfg.Timeout, "timeout", 10*time.Second, i18n.T(i18n.FlagTimeout))
+	rootCmd.PersistentFlags().BoolVar(&cfg.AutoReconnect, "auto-reconnect", false, "Reconnect automatically when the SSH channel is lost")
+	rootCmd.PersistentFlags().DurationVar(&cfg.ReconnectInterval, "reconnect-interval", 5*time.Second, "Delay between SSH reconnect attempts")
+	rootCmd.PersistentFlags().DurationVar(&cfg.KeepAliveInterval, "keepalive-interval", 15*time.Second, "SSH channel health-check interval")
 
 	// Proxy options.
 	rootCmd.PersistentFlags().StringVarP(&cfg.ListenAddr, "listen", "l", ":8080", i18n.T(i18n.FlagListen))
@@ -395,6 +409,9 @@ func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]s
 	copyIf("insecure-host-key", func() { dst.InsecureHostKey = src.InsecureHostKey })
 	copyIf("jump", func() { dst.JumpHosts = src.JumpHosts })
 	copyIf("timeout", func() { dst.Timeout = src.Timeout })
+	copyIf("auto-reconnect", func() { dst.AutoReconnect = src.AutoReconnect })
+	copyIf("reconnect-interval", func() { dst.ReconnectInterval = src.ReconnectInterval })
+	copyIf("keepalive-interval", func() { dst.KeepAliveInterval = src.KeepAliveInterval })
 	copyIf("http", func() { dst.ListenAddr = src.ListenAddr })
 	copyIf("listen", func() { dst.ListenAddr = src.ListenAddr })
 	copyIf("socks5", func() { dst.SocksAddr = src.SocksAddr })
@@ -476,6 +493,9 @@ func localizeCLI() {
 	if flag := rootCmd.PersistentFlags().Lookup("service-force"); flag != nil {
 		flag.Usage = i18n.Text("Overwrite an existing service definition", "Перезаписать существующее определение службы")
 	}
+	setFlagUsage(rootCmd, "auto-reconnect", i18n.Text("Reconnect automatically when the SSH channel is lost", "Автоматически переподключаться при обрыве SSH-канала"))
+	setFlagUsage(rootCmd, "reconnect-interval", i18n.Text("Delay between SSH reconnect attempts", "Пауза между попытками переподключения SSH"))
+	setFlagUsage(rootCmd, "keepalive-interval", i18n.Text("SSH channel health-check interval", "Интервал проверки состояния SSH-канала"))
 }
 
 func setFlagUsage(cmd *cobra.Command, name, usage string) {
@@ -493,13 +513,13 @@ func parseSSHTarget(target string) (string, string, error) {
 		return "", "", nil
 	}
 
-	parts := strings.Split(target, "@")
-	if len(parts) != 2 {
+	at := strings.LastIndex(target, "@")
+	if at <= 0 || at == len(target)-1 || strings.Contains(target[:at], "@") {
 		return "", "", errors.New(i18n.Text("invalid SSH target; expected user@host", "неверный формат SSH-цели, требуется формат user@host"))
 	}
 
-	user := parts[0]
-	host := parts[1]
+	user := target[:at]
+	host := target[at+1:]
 
 	// Validate parsed values.
 	if user == "" || host == "" {
@@ -510,7 +530,16 @@ func parseSSHTarget(target string) (string, string, error) {
 }
 
 func addressWithDefaultPort(host, port string) (string, error) {
-	if _, _, err := net.SplitHostPort(host); err == nil {
+	if err := validatePort(port); err != nil {
+		return "", err
+	}
+	if parsedHost, parsedPort, err := net.SplitHostPort(host); err == nil {
+		if parsedHost == "" {
+			return "", errors.New(i18n.Text("SSH server host must not be empty", "хост SSH-сервера не может быть пустым"))
+		}
+		if err := validatePort(parsedPort); err != nil {
+			return "", err
+		}
 		return host, nil
 	}
 	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
@@ -520,4 +549,12 @@ func addressWithDefaultPort(host, port string) (string, error) {
 		return "", fmt.Errorf(i18n.Text("invalid SSH server address: %s", "неверный адрес SSH-сервера: %s"), host)
 	}
 	return net.JoinHostPort(host, port), nil
+}
+
+func validatePort(port string) error {
+	value, err := net.LookupPort("tcp", port)
+	if err != nil || value < 1 || value > 65535 {
+		return fmt.Errorf(i18n.Text("invalid SSH port: %s", "неверный порт SSH: %s"), port)
+	}
+	return nil
 }

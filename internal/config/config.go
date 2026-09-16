@@ -18,60 +18,66 @@ type SubnetAlias struct {
 
 // Config stores the resolved application configuration.
 type Config struct {
-	ListenAddr      string
-	SSHServer       string
-	SSHUser         string
-	SSHPassword     string
-	SSHKeyFile      string
-	KnownHostsFile  string
-	InsecureHostKey bool
-	HTTPUpstream    string
-	SSHPort         string
-	SocksAddr       string
-	TunMode         bool
-	TunCIDR         string
-	TunRoute        []string
-	TunGlobal       bool
-	SubnetAliases   []SubnetAlias
-	JumpHosts       []string
-	Timeout         time.Duration
-	Verbose         bool
-	LogFile         string
-	InteractiveAuth bool
-	SystemProxy     bool
-	RuleFile        string
-	ServiceManager  string
-	ServiceName     string
-	ServiceUser     string
-	ServiceGroup    string
-	ServiceEnable   bool
-	ServiceStart    bool
+	ListenAddr        string
+	SSHServer         string
+	SSHUser           string
+	SSHPassword       string
+	SSHKeyFile        string
+	KnownHostsFile    string
+	InsecureHostKey   bool
+	HTTPUpstream      string
+	SSHPort           string
+	SocksAddr         string
+	TunMode           bool
+	TunCIDR           string
+	TunRoute          []string
+	TunGlobal         bool
+	SubnetAliases     []SubnetAlias
+	JumpHosts         []string
+	Timeout           time.Duration
+	AutoReconnect     bool
+	ReconnectInterval time.Duration
+	KeepAliveInterval time.Duration
+	Verbose           bool
+	LogFile           string
+	InteractiveAuth   bool
+	SystemProxy       bool
+	RuleFile          string
+	ServiceManager    string
+	ServiceName       string
+	ServiceUser       string
+	ServiceGroup      string
+	ServiceEnable     bool
+	ServiceStart      bool
 }
 
 // NewConfig returns the default configuration.
 func NewConfig() *Config {
 	return &Config{
-		ListenAddr:      ":8080",
-		SSHServer:       "",
-		SSHPort:         "22",
-		JumpHosts:       []string{},
-		Timeout:         10 * time.Second,
-		Verbose:         false,
-		InteractiveAuth: true,
-		SystemProxy:     false,
-		RuleFile:        "",
-		SocksAddr:       "",
-		TunMode:         false,
-		TunCIDR:         "10.0.0.1/24",
-		TunRoute:        []string{},
-		TunGlobal:       false,
-		SubnetAliases:   []SubnetAlias{},
-		ServiceManager:  "auto",
-		ServiceName:     "ssh-tun",
-		ServiceUser:     "root",
-		ServiceGroup:    "root",
-		ServiceEnable:   true,
-		ServiceStart:    true,
+		ListenAddr:        ":8080",
+		SSHServer:         "",
+		SSHPort:           "22",
+		JumpHosts:         []string{},
+		Timeout:           10 * time.Second,
+		AutoReconnect:     false,
+		ReconnectInterval: 5 * time.Second,
+		KeepAliveInterval: 15 * time.Second,
+		Verbose:           false,
+		InteractiveAuth:   true,
+		SystemProxy:       false,
+		RuleFile:          "",
+		SocksAddr:         "",
+		TunMode:           false,
+		TunCIDR:           "10.0.0.1/24",
+		TunRoute:          []string{},
+		TunGlobal:         false,
+		SubnetAliases:     []SubnetAlias{},
+		ServiceManager:    "auto",
+		ServiceName:       "ssh-tun",
+		ServiceUser:       "root",
+		ServiceGroup:      "root",
+		ServiceEnable:     true,
+		ServiceStart:      true,
 	}
 }
 
@@ -129,8 +135,17 @@ func (c *Config) Validate() error {
 	if c.SSHUser == "" {
 		return errors.New(i18n.Text("SSH user name is required", "необходимо указать имя пользователя SSH"))
 	}
+	if err := validatePort(c.SSHPort); err != nil {
+		return err
+	}
 	if c.Timeout <= 0 {
 		return errors.New(i18n.Text("timeout must be greater than zero", "таймаут должен быть больше нуля"))
+	}
+	if c.ReconnectInterval <= 0 {
+		return errors.New(i18n.Text("reconnect interval must be greater than zero", "интервал переподключения должен быть больше нуля"))
+	}
+	if c.KeepAliveInterval <= 0 {
+		return errors.New(i18n.Text("keepalive interval must be greater than zero", "интервал проверки соединения должен быть больше нуля"))
 	}
 	if _, _, err := net.SplitHostPort(c.ListenAddr); err != nil {
 		return fmt.Errorf(i18n.Text("invalid HTTP proxy address: %w", "неверный адрес HTTP-прокси: %w"), err)
@@ -144,6 +159,21 @@ func (c *Config) Validate() error {
 		if _, _, err := net.SplitHostPort(c.HTTPUpstream); err != nil {
 			return fmt.Errorf(i18n.Text("invalid upstream HTTP server address: %w", "неверный адрес вышестоящего HTTP-сервера: %w"), err)
 		}
+	}
+	if c.TunMode {
+		ip, _, err := net.ParseCIDR(c.TunCIDR)
+		if err != nil || ip.To4() == nil {
+			return fmt.Errorf(i18n.Text("invalid IPv4 TUN CIDR: %s", "неверный IPv4 CIDR для TUN: %s"), c.TunCIDR)
+		}
+		for _, route := range c.TunRoute {
+			_, routeNet, err := net.ParseCIDR(route)
+			if err != nil || routeNet.IP.To4() == nil {
+				return fmt.Errorf(i18n.Text("invalid IPv4 TUN route: %s", "неверный IPv4-маршрут TUN: %s"), route)
+			}
+		}
+	}
+	if c.ServiceManager != "auto" && c.ServiceManager != "systemd" && c.ServiceManager != "openrc" && c.ServiceManager != "windows" {
+		return fmt.Errorf(i18n.Text("invalid service manager: %s", "неверный менеджер служб: %s"), c.ServiceManager)
 	}
 
 	if !c.InteractiveAuth && c.SSHPassword == "" && c.SSHKeyFile == "" {

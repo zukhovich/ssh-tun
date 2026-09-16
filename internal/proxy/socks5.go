@@ -20,19 +20,35 @@ import (
 var errRejected = errors.New("соединение отклонено правилами маршрутизации")
 
 type SOCKS5OverSSH struct {
-	cfg      *config.Config
-	logger   *logger.Logger
-	ssh      *SSHClient
-	router   *router.Router
-	listener net.Listener
-	mu       sync.Mutex
-	active   map[net.Conn]struct{}
-	closed   bool
-	wg       sync.WaitGroup
+	cfg       *config.Config
+	logger    *logger.Logger
+	ssh       *SSHClient
+	router    *router.Router
+	listener  net.Listener
+	mu        sync.Mutex
+	active    map[net.Conn]struct{}
+	closed    bool
+	started   chan struct{}
+	startErr  error
+	startOnce sync.Once
+	wg        sync.WaitGroup
 }
 
 func NewSOCKS5OverSSH(cfg *config.Config, log *logger.Logger, sshClient *SSHClient, r *router.Router) (*SOCKS5OverSSH, error) {
-	return &SOCKS5OverSSH{cfg: cfg, logger: log, ssh: sshClient, router: r, active: make(map[net.Conn]struct{})}, nil
+	return &SOCKS5OverSSH{cfg: cfg, logger: log, ssh: sshClient, router: r, active: make(map[net.Conn]struct{}), started: make(chan struct{})}, nil
+}
+
+// Ready waits until the listener has opened or startup has failed.
+func (s *SOCKS5OverSSH) Ready() error {
+	<-s.started
+	return s.startErr
+}
+
+func (s *SOCKS5OverSSH) signalStarted(err error) {
+	s.startOnce.Do(func() {
+		s.startErr = err
+		close(s.started)
+	})
 }
 
 func (s *SOCKS5OverSSH) Start() error {
@@ -42,15 +58,19 @@ func (s *SOCKS5OverSSH) Start() error {
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
+		s.signalStarted(net.ErrClosed)
 		return net.ErrClosed
 	}
 	listener, err := net.Listen("tcp", s.cfg.SocksAddr)
 	if err != nil {
 		s.mu.Unlock()
-		return fmt.Errorf(i18n.Text("failed to start the SOCKS5 proxy: %w", "не удалось запустить SOCKS5-прокси: %w"), err)
+		err = fmt.Errorf(i18n.Text("failed to start the SOCKS5 proxy: %w", "не удалось запустить SOCKS5-прокси: %w"), err)
+		s.signalStarted(err)
+		return err
 	}
 	s.listener = listener
 	s.mu.Unlock()
+	s.signalStarted(nil)
 	s.logger.Infof(i18n.Text("SOCKS5 proxy is listening on %s", "SOCKS5-прокси запущен на %s"), listener.Addr())
 	for {
 		conn, err := listener.Accept()
@@ -215,6 +235,9 @@ func (s *SOCKS5OverSSH) dialTarget(ctx context.Context, addr, host string) (net.
 		conn, err := (&net.Dialer{Timeout: s.cfg.Timeout}).DialContext(ctx, "tcp", addr)
 		return conn, action, err
 	default:
+		if s.ssh == nil {
+			return nil, action, errors.New(i18n.Text("SSH client is not ready", "SSH-клиент не готов"))
+		}
 		conn, err := s.ssh.DialContext(ctx, "tcp", addr)
 		return conn, action, err
 	}

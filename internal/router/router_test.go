@@ -40,7 +40,9 @@ func TestRouterMatch(t *testing.T) {
 func TestRouterRejectsInvalidConfiguration(t *testing.T) {
 	for _, content := range []string{
 		"mode: invalid\n",
+		"unknown: true\n",
 		"rules:\n  - DOMAIN\n",
+		"rules:\n  - MATCH,PROXY\n",
 		"rules:\n  - DOMAIN,example.com,UNKNOWN\n",
 		"rules:\n  - IP-CIDR,invalid,DIRECT\n",
 	} {

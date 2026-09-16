@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestParseJumpHost(t *testing.T) {
 	tests := []struct{ value, user, host, port string }{
@@ -45,5 +48,31 @@ func TestValidateTimeoutAndAddresses(t *testing.T) {
 	cfg.Timeout = 0
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("a zero timeout must be rejected")
+	}
+	cfg.Timeout = 10 * time.Second
+	cfg.ReconnectInterval = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("a zero reconnect interval must be rejected")
+	}
+	cfg.ReconnectInterval = 5 * time.Second
+	cfg.KeepAliveInterval = -1
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("a negative keepalive interval must be rejected")
+	}
+}
+
+func TestValidatePortAndTUNRoutes(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SSHServer = "example.com:22"
+	cfg.SSHUser = "user"
+	cfg.SSHPort = "70000"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("an invalid SSH port must be rejected")
+	}
+	cfg.SSHPort = "22"
+	cfg.TunMode = true
+	cfg.TunRoute = []string{"not-a-cidr"}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("an invalid TUN route must be rejected")
 	}
 }

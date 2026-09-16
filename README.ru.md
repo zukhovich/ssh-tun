@@ -4,7 +4,7 @@
 
 **Версия 1.0.3**
 
-`ssh-tun` — сетевой прокси для Linux, который передаёт HTTP, HTTPS CONNECT, SOCKS5 и TUN-трафик через SSH. Поддерживаются промежуточные SSH-узлы, правила маршрутизации, отображение подсетей, настройка прокси GNOME и установка службы systemd/OpenRC.
+`ssh-tun` — автономный сетевой прокси для Linux и Windows, который передаёт HTTP, HTTPS CONNECT, SOCKS5 и TUN-трафик через SSH. Поддерживаются промежуточные SSH-узлы, правила маршрутизации, отображение подсетей, автоматическое переподключение, установка нативной службы и создание шаблона конфигурации для текущей ОС.
 
 Репозиторий: <https://github.com/zukhovich/ssh-tun>
 
@@ -19,8 +19,10 @@
 - Английский и русский интерфейс командной строки.
 - Строгая конфигурация приложения в YAML.
 - Настройка системного прокси GNOME с восстановлением состояния.
-- Установка служб systemd и OpenRC.
-- Статические бинарные файлы Linux для `amd64` и `arm64`.
+- Установка нативных служб systemd, OpenRC и Windows Service.
+- Создание шаблона конфигурации для текущей ОС.
+- Мониторинг SSH-канала и автоматическое переподключение.
+- Статические Linux- и автономные Windows-бинарники для `amd64` и `arm64`.
 
 ## Установка
 
@@ -48,7 +50,7 @@ make test vet build
 file build/ssh-tun
 ```
 
-Результат `build/ssh-tun` собирается с `CGO_ENABLED=0` как статически скомпонованный исполняемый файл Linux.
+Основной результат — `build/ssh-tun`, статически скомпонованный и очищенный Linux-бинарник. Релизная упаковка также создаёт автономные бинарники Linux и Windows для `amd64` и `arm64`.
 
 Релизные архивы и контрольные суммы:
 
@@ -83,11 +85,13 @@ curl --proxy socks5h://127.0.0.1:1080 https://example.org
 
 ## Конфигурация
 
-Создание полного шаблона:
+Создание шаблона для текущей операционной системы (пути `~/.ssh` в Linux и `%USERPROFILE%`/`%PROGRAMDATA%` в Windows):
 
 ```sh
 ssh-tun --write-config ./ssh-tun.yaml
 ```
+
+Готовые примеры для Linux также находятся в [`configs/linux/config.yaml`](configs/linux/config.yaml) и [`configs/linux/rules.yaml`](configs/linux/rules.yaml).
 
 Запуск:
 
@@ -117,7 +121,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-Нужны права root и `iproute2`. Версия 1.0.3 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
+В Linux для TUN нужны права root и `iproute2`, в Windows — консоль с повышенными правами администратора. Версия 1.0.3 пересылает IPv4 TCP и DNS; произвольная пересылка UDP не реализована.
 
 ## Язык
 
@@ -128,7 +132,18 @@ ssh-tun --lang ru --help
 
 Поле `language` в YAML принимает `en` или `ru`. Без файла конфигурации и параметра `--lang` по умолчанию используется английский язык независимо от локали системы.
 
-## systemd и OpenRC
+## Автоматическое переподключение
+
+Мониторинг SSH-канала и автоматическое переподключение без перезапуска локальных HTTP/SOCKS listener-ов:
+
+```sh
+ssh-tun user@example.com --auto-reconnect \
+  --keepalive-interval 15s --reconnect-interval 5s
+```
+
+В YAML используются параметры `ssh.auto_reconnect`, `ssh.keepalive_interval` и `ssh.reconnect_interval`.
+
+## systemd, OpenRC и службы Windows
 
 Сначала создайте постоянную конфигурацию:
 
@@ -138,17 +153,18 @@ sudo ssh-tun --write-config /etc/ssh-tun/config.yaml
 sudo chmod 600 /etc/ssh-tun/config.yaml
 ```
 
-Установка и удаление службы:
+Установка и удаление нативной службы с автоматическим выбором для текущей ОС:
 
 ```sh
-sudo ssh-tun --config /etc/ssh-tun/config.yaml --install-service auto
-sudo ssh-tun --config /etc/ssh-tun/config.yaml --remove-service auto
+ssh-tun --config /path/to/config.yaml --install-service auto
+ssh-tun --config /path/to/config.yaml --remove-service auto
 ```
 
-Вместо `auto` можно явно указать `systemd` или `openrc`. Служба должна использовать неинтерактивную SSH-аутентификацию. `--sys-proxy` предназначен для пользовательской сессии GNOME и обычно должен быть отключён в службе root.
+В Linux `auto` выбирает systemd или OpenRC. В Windows служба создаётся и удаляется через `sc.exe`; консоль необходимо запустить от имени администратора. В Linux нужны права root. Служба должна использовать неинтерактивную SSH-аутентификацию. `--sys-proxy` предназначен для пользовательской сессии GNOME и обычно должен быть отключён в службе.
 
 ## Безопасность
 
+- Никогда не публикуйте закрытые ключи, пароли, токены, созданный `known_hosts` и реальные производственные конфигурации.
 - Проверка ключа SSH-сервера включена по умолчанию.
 - `--insecure-host-key` отключает проверку и небезопасен.
 - `--pass` раскрывает пароль через аргументы процесса; рекомендуется SSH-ключ.

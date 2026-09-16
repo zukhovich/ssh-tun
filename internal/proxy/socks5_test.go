@@ -57,3 +57,21 @@ func TestSOCKS5ReadDomainRequest(t *testing.T) {
 	_, _ = client.Write(request)
 	<-done
 }
+
+func TestSOCKS5StartReportsBindError(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	cfg := config.NewConfig()
+	cfg.SocksAddr = listener.Addr().String()
+	server, err := NewSOCKS5OverSSH(cfg, logger.NewLogger(false), nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	go server.Start()
+	if err := server.Ready(); err == nil {
+		t.Fatal("expected a bind error")
+	}
+}

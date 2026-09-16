@@ -16,8 +16,14 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.5"
-      - name: Test
-        run: go test ./...
+      - name: Test and vet
+        run: |
+          go test ./...
+          go vet ./...
+      - name: Verify Windows cross-build
+        run: |
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -o /tmp/ssh-tun.exe ./cmd/ssh-tun
+          CGO_ENABLED=0 GOOS=windows GOARCH=arm64 go build -trimpath -o /tmp/ssh-tun-arm64.exe ./cmd/ssh-tun
       - name: Verify tag and source version
         shell: bash
         run: |
@@ -30,15 +36,16 @@ jobs:
         with:
           generate_release_notes: true
           body: |
-            ## ssh-tun 1.0.2
+            ## ssh-tun 1.0.3
 
-            - Added OpenSSH-style host-key confirmation on first connection and automatic persistence to `known_hosts`.
-            - Kept strict protection against changed and revoked SSH host keys.
-            - Combined key, password, and keyboard-interactive authentication into one SSH handshake.
-            - Made GNOME system-proxy integration opt-in and non-fatal when `gsettings` is missing or unusable.
-            - Kept the default proxy workflow free of optional desktop runtime dependencies.
-            - Added regression tests for first-use host keys, key mismatches, system-proxy defaults, and missing `gsettings`.
+            - Added OS-aware configuration templates and native systemd, OpenRC, and Windows service management.
+            - Added monitored SSH keepalives and automatic reconnection without restarting local proxy listeners.
+            - Fixed Windows elevation handling so Windows never attempts to invoke sudo.
+            - Tightened configuration, routing, startup, and service validation.
+            - Added Linux and Windows amd64/arm64 release binaries and regression tests.
           files: |
             build/ssh-tun_*_linux_amd64.tar.gz
             build/ssh-tun_*_linux_arm64.tar.gz
+            build/ssh-tun_*_windows_amd64.exe.tar.gz
+            build/ssh-tun_*_windows_arm64.exe.tar.gz
             build/SHA256SUMS

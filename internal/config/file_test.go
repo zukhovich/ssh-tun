@@ -38,7 +38,7 @@ service:
 	if language != "ru" || cfg.SSHServer != "alice@example.com" || cfg.Timeout != 15*time.Second || cfg.ListenAddr != ":9090" {
 		t.Fatalf("unexpected loaded configuration: %+v, %q", cfg, language)
 	}
-	if len(aliases) != 1 || cfg.ServiceManager != "openrc" || cfg.ServiceName != "tunnel" {
+	if len(aliases) != 1 || cfg.ServiceManager != "openrc" || cfg.ServiceName != "tunnel" || !cfg.ServiceEnable || !cfg.ServiceStart {
 		t.Fatalf("unexpected aliases/service configuration: %v, %+v", aliases, cfg)
 	}
 }
@@ -50,5 +50,44 @@ func TestLoadFileRejectsUnknownFields(t *testing.T) {
 	}
 	if _, _, _, err := LoadFile(path); err == nil {
 		t.Fatal("expected an unknown-field error")
+	}
+}
+
+func TestLoadFileKeepsServiceDefaultsWhenOmitted(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ssh-tun.yaml")
+	if err := os.WriteFile(path, []byte("version: 1\nssh:\n  target: user@example.com\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, _, err := LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.ServiceEnable || !cfg.ServiceStart {
+		t.Fatalf("omitted service booleans must keep defaults: %+v", cfg)
+	}
+}
+
+func TestLoadFileRejectsMultipleDocuments(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ssh-tun.yaml")
+	if err := os.WriteFile(path, []byte("version: 1\n---\nversion: 1\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, _, err := LoadFile(path); err == nil {
+		t.Fatal("expected a multiple-document error")
+	}
+}
+
+func TestLoadFileReconnectSettings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "ssh-tun.yaml")
+	content := "version: 1\nssh:\n  target: user@example.com\n  auto_reconnect: true\n  reconnect_interval: 7s\n  keepalive_interval: 9s\n"
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _, _, err := LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.AutoReconnect || cfg.ReconnectInterval != 7*time.Second || cfg.KeepAliveInterval != 9*time.Second {
+		t.Fatalf("unexpected reconnect settings: %+v", cfg)
 	}
 }
