@@ -33,7 +33,7 @@ func NewManager(log *logger.Logger, httpListenAddr, socksListenAddr string) *Man
 	normalize := func(address, fallback string) string {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
-			log.Warnf(i18n.Text("Failed to parse address %s: %v; using %s", "Не удалось разобрать адрес %s: %v; используется %s"), address, err, fallback)
+			log.Warnf(i18n.T("Failed to parse address %s: %v; using %s"), address, err, fallback)
 			return fallback
 		}
 		if host == "" || host == "0.0.0.0" || host == "::" {
@@ -63,13 +63,13 @@ func (m *Manager) Enable() error {
 		return nil
 	}
 	if err := m.saveCurrentSettings(); err != nil {
-		return fmt.Errorf(i18n.Text("failed to save system proxy settings: %w", "не удалось сохранить настройки системного прокси: %w"), err)
+		return fmt.Errorf(i18n.T("failed to save system proxy settings: %w"), err)
 	}
 	if err := m.applySettings(); err != nil {
 		return errors.Join(err, m.restoreSettings())
 	}
 	m.enabled = true
-	m.logger.Infof(i18n.Text("System proxy configured for HTTP %s", "Системный прокси настроен на HTTP %s"), m.httpAddr)
+	m.logger.Infof(i18n.T("System proxy configured for HTTP %s"), m.httpAddr)
 	return nil
 }
 
@@ -83,7 +83,7 @@ func (m *Manager) Disable() error {
 		return err
 	}
 	m.enabled = false
-	m.logger.Info(i18n.Text("System proxy settings restored", "Настройки системного прокси восстановлены"))
+	m.logger.Info(i18n.T("System proxy settings restored"))
 	return nil
 }
 
@@ -108,7 +108,7 @@ func (m *Manager) saveCurrentSettings() error {
 	for _, setting := range settingKeys {
 		output, err := m.run("gsettings", "get", setting.schema, setting.property)
 		if err != nil {
-			return fmt.Errorf("gsettings get %s %s: %s: %w", setting.schema, setting.property, strings.TrimSpace(string(output)), err)
+			return fmt.Errorf(i18n.T("gsettings get %s %s: %s: %w"), setting.schema, setting.property, strings.TrimSpace(string(output)), err)
 		}
 		m.origSettings[setting.key] = strings.TrimSpace(string(output))
 	}
@@ -184,7 +184,7 @@ func (m *Manager) restoreSettings() error {
 func (m *Manager) runCommand(args ...string) error {
 	output, err := m.run("gsettings", args...)
 	if err != nil {
-		return fmt.Errorf("gsettings %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(output)), err)
+		return fmt.Errorf(i18n.T("gsettings %s: %s: %w"), strings.Join(args, " "), strings.TrimSpace(string(output)), err)
 	}
 	return nil
 }

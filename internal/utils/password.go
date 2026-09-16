@@ -17,7 +17,7 @@ func ReadPasswordFromTerminal(prompt string) (string, error) {
 	passwordByte, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println()
 	if err != nil {
-		return "", fmt.Errorf(i18n.Text("failed to read the password: %w", "ошибка чтения пароля: %w"), err)
+		return "", fmt.Errorf(i18n.T("failed to read the password: %w"), err)
 	}
 
 	return string(passwordByte), nil
@@ -29,9 +29,9 @@ func GetSSHPassword(configPassword string, interactive bool, user, server string
 		return configPassword, nil
 	}
 	if !interactive {
-		return "", errors.New(i18n.Text("no password was configured and interactive authentication is disabled", "пароль не указан, интерактивная аутентификация отключена"))
+		return "", errors.New(i18n.T("no password was configured and interactive authentication is disabled"))
 	}
 
-	prompt := fmt.Sprintf(i18n.Text("Enter password for %s@%s: ", "Введите пароль для %s@%s: "), user, server)
+	prompt := fmt.Sprintf(i18n.T("Enter password for %s@%s: "), user, server)
 	return ReadPasswordFromTerminal(prompt)
 }

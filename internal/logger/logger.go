@@ -50,12 +50,12 @@ func (l *Logger) SetLogFile(filePath string) error {
 
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf(i18n.Text("failed to create the log directory: %w", "не удалось создать директорию для журнала: %w"), err)
+		return fmt.Errorf(i18n.T("failed to create the log directory: %w"), err)
 	}
 
 	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return fmt.Errorf(i18n.Text("failed to open the log file: %w", "не удалось открыть файл журнала: %w"), err)
+		return fmt.Errorf(i18n.T("failed to open the log file: %w"), err)
 	}
 
 	if l.file != nil {

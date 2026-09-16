@@ -1,0 +1,288 @@
+version: 1
+checksums:
+    ssh-tun/ru:
+        '%s %s: %s: %w': 669924d65f11f64f3827c973b1b73fcb
+        ? |
+            %s service %q installed
+        : 4f0fd3a014d65007a9230e636fec6462
+        ? |
+            %s service %q removed
+        : 6618c4b57e5b2ced746b71d55ecc22eb
+        --config is required for service management: f64e5c5a093aff5ee89936dc441b0970
+        '[SOCKS5] Connected to %s (rule: %s)': 3b826228dda38c66772bb9585c097c90
+        '[TUN] Adding bypass route for SSH server %s (%s) via %s': 9d82cbc797027823549863bebf109b36
+        '[TUN] Adding global routes (0.0.0.0/1, 128.0.0.0/1)...': 5935c1f41bccdd7db3809e026186a141
+        '[TUN] Adding subnet alias route: %s -> TUN': 4670b48c41dc2ac74d7d275742a3dbbe
+        '[TUN] Configuring IP address for %s: %s': 697b02d1c1b0dd30eea84543fd8ed44b
+        '[TUN] Configuring global routes...': 36537b944e26b015672496179d952228
+        '[TUN] Configuring routes: %v': 1b4b54048073a8ebe2b46400cf69ea7f
+        '[TUN] Default gateway detected: %s': f03fa6846f6cd1009751e6afa2d6b9d9
+        '[TUN] Device created: %s': 86cd78e0c186ea4023a17f9a57306c86
+        '[TUN] Device read error: %v': 2b2bd34e0edfa5a61a62a79cc409e58e
+        '[TUN] Device write error: %v': 93765e1ada647d179d1acb560cb70de3
+        '[TUN] Failed to connect to remote DNS %s: %v': 7ef48fb94090f4b297982459eade8998
+        '[TUN] Failed to connect to target %s: %v': e3c51648454afbc48aed231f2ce18a50
+        '[TUN] Failed to create a UDP endpoint: %v': dd67dbd4f9941902b2c23ebffa0b3079
+        '[TUN] Failed to list network interfaces; skipping conflict checks: %v': 5485935e74d9f988d88e3af697f55e01
+        '[TUN] Mode started: IP address %s, peer address %s': 967562dc8e758849caddbd2e6a8bcf0e
+        '[TUN] NAT rule matched: %s -> %s (offset: %d)': de4c172d72e123cda4904ddfbc915aa8
+        '[TUN] Route already exists; ignoring: %s': d3daa44d80e79b1144636b078a2c0f32
+        '[TUN] Route conflict warning: requested route %s contains IP %s of interface %s. Traffic may use the physical interface.': b5fcbd93f7e92d41cd018f754f66df21
+        '[TUN] TCP request received -> %s (original target: %s:%d)': f469ae80163b4232d1972bc2f956f78e
+        '[TUN] Tunnel established: %s <-> %s': d03fb72aefd3371a919626ad4b2732e9
+        Absolute URL is required: 0811cdc77a15e76a42ee1f146772132b
+        Add a static TUN route (repeatable): c7af133f4dfc83aa6baec870fde63d93
+        Added %d key(s) from the SSH agent: 6f26f74a922c588c923c1e32b6e5c6ce
+        'Added default SSH key: %s': 1e30dd91b8e8a2720cba23acf992622f
+        Auto-reconnect enabled: 3318978e2b563c615c740ad2b834bf87
+        'Cannot determine the home directory for default SSH keys: %v': 33f8db3e40bb1362422b20aacfc0f02c
+        Closing SSH jump-host connection %d: c5f21f2571c3ccfdba025808e33aa896
+        Closing the target SSH connection: 9189e447d5426fec24e3acdb746c0158
+        Comma-separated SSH jump hosts (user@host:port): e81eb69123aa5d076235f524cf9e93db
+        Configure and restore the GNOME system proxy: 5b11b81aeedf72d0891adcb0f655e2ab
+        'Connected to SSH jump host %d: %s@%s': 270e6e76db050d703a8b93726181efae
+        'Connected to the target SSH server: %s': 408776820a88d54ca76fb908bbff825a
+        'Connecting to SSH jump host %d/%d: %s': 7d612fb4456431290040d5cd964b335b
+        Connection hijacking is not supported: 25051dfbc4de01a70b8f8b46e7f10057
+        Connection rejected by routing rules: 79daaeb2132f1a48c9a6c2e9e3c70c39
+        Connection timeout: 939bf39176f01b8324dfed32f5580af3
+        'Custom routing rules enabled:': 3e8d6051978cc7d53e7691287209ee0d
+        'Data transfer error: %v': fc2ceaa617e728037e8357721d41e2bf
+        Delay between SSH reconnect attempts: 82ea4729c713b9c7d73f876eab238df5
+        'Deprecated: use --http-upstream': 1b7bcf9a9e72904f4bd18830d416bf37
+        'Deprecated: use --identity-file': d1c1300e11621fc29db38b63205f9a30
+        'Direct connection to SSH server:': 64eb4177e487cca02ab0eae2d0b2cc9c
+        Disable SSH host key verification (unsafe): d0bb82f1b11e49a150afd95327cb99db
+        Enable TUN mode: 577423fe9f9a18f27628a688b6d2767a
+        Enable verbose logging: 25f321fe018cf20163dc0c70e2eea888
+        'Enter passphrase for SSH key %s: ': 936fa3a457312bf652db84ff9d9efbcf
+        'Enter password for %s@%s: ': 81213e8801d55474c00f45e646290dfb
+        'Failed to close the HTTP proxy: %v': 920eb305843204786db5be074d90a255
+        'Failed to close the SOCKS5 proxy: %v': 5d5f5b16294a2ed8a9d8ac674d8bcac5
+        'Failed to close the TUN service: %v': 551e0c5d52564c052851e77fe385ce50
+        'Failed to connect to SSH jump host %s: %v': d2a91d6aef85aca92f5ed95294f01e47
+        Failed to connect to target: ec705bf27f356672c3d9a39d46d4b9c3
+        Failed to connect to target through SSH: ff06d2c3cb1e3f30876163b0e825b406
+        'Failed to connect to the target SSH server %s: %v': 264866a610351ef03506972a2b4f296a
+        'Failed to create a TCP endpoint: %v': 82e39a64fef624089ae815ad98a909ae
+        'Failed to list SSH agent keys: %v': 835d71bde784280482386e98dbe918fd
+        'Failed to parse SSH jump-host parameters: %v': 91ffa6f3a1fe43451a62aeabdbc67454
+        'Failed to parse address %s: %v; using %s': a64fa6dd43609777e5fff76fbbdb34dd
+        Failed to perform direct request: 2575a488de27d09ce5e150ec6964ec5c
+        Failed to read response: 7c1e6aeadeaea95e642ebabc0cae7f85
+        'Failed to restore system proxy settings: %v': 34cfb7e56a2eb5f6cacc2e72c8b5282e
+        Failed to send request: d6fc18794d0b649536a0c95482476833
+        Flags: 4ea7801f17a4e5485e8b050c052fb443
+        Force HTTP requests through an upstream host:port: 86da2a8ab9eb4d27d71a4fb9fcee65be
+        'HTTP proxy:': 0928cb1638c17c3f578b6234d043282b
+        HTTP/HTTPS proxy is listening on %s: cd57a20991ebab0cdb86dd5fc3503ffd
+        IPv4 address overflow: e2677b201cbdcf9019e17c05d9569bfd
+        'IPv6 addresses must be enclosed in brackets: %s': 713aa9855a0aeb4069c69dc740b1a74a
+        'IPv6 is not supported: %s': 9d5259fbe250eff9c5647c360d6a4c5c
+        Install a service using auto, systemd, or openrc: 5ab2949a0a941d9b03f9311aa7372530
+        Lightweight SSH-based HTTP proxy: 504bb643c3f65804d17eab79b2be8055
+        'Loaded routing rules file: %s': 617a33cd8a0538cad3897cd6b9aab353
+        Local HTTP proxy address: 44a5371141a4807294bd0da316fe9f00
+        Local HTTP proxy address (deprecated; use --http): 5d3817750d4782a0978b68771cb05c6e
+        Log file path: 7680a3e5d8267123c2ad7fc52f63d3a1
+        'Logs will also be written to: %s': a01a6d081fe9a6ee61ef60de3172c57c
+        NAT mapping in SrcCIDR:DstCIDR format: 2e03725f0b8d14ba57c4e1a92d906387
+        Overwrite an existing service definition: 4bfa7d4f09d140aca6d9ee2f49edc61e
+        Path to the YAML configuration file: f4acc8e602287e9533740b8cdfc40336
+        'Preparing to connect to the target SSH server: %s': a32f71f139e8a66c6cce7c9924f2c10e
+        Press Ctrl+C to exit: fbd65a27e6bfaef9437a9487fb4e673f
+        Private key file: e16cae17d5227169212a70d6809f9f11
+        Proxy service started: 730396547c3f9dc9efff693af63ac009
+        Reconnect automatically when the SSH channel is lost: 9ae5d13ff389a9075056ff07a2f33b31
+        Remove a service using auto, systemd, or openrc: 6a79fffb696e1089d04b96d34427edcc
+        'Request rejected by a routing rule: %s': 5e23531dafedb400679a0b76fc7766be
+        Request rejected by routing rules: 0a372d5142d13cf7806e9cf20e3d80f2
+        Route all traffic through TUN: 323b72a4aa8d752c39875068de29e7f0
+        Routing rules file: 0d01f8a2460dbda797dd8fae8325e9c8
+        SOCKS5 proxy address (for example :1080): e00e89a50c9f96241d028e979a1fe7e6
+        SOCKS5 proxy is listening on %s: 6fce8ec004ad52fbd9dce25586110fc9
+        'SOCKS5 proxy:': 19699a6dcac97ea7fe37b2079c1f1ad7
+        SSH channel health-check interval: e24eda8952c8f35700cde773b84971ff
+        SSH client is closed: 0a9c980f454c7b641387335aab2498b3
+        SSH client is not ready: ac0cf6708ec3dacac43ca9f0cbd42a54
+        'SSH connection error: %w': 0629d807e23f9a0b5085c97f39a08be3
+        SSH connection lost; reconnecting every %s...: 261b376eb0163b18bbb38f9db6bd1129
+        SSH connection restored: d9411f59fc1730788a56e7e0d49330ef
+        'SSH host key is unknown; add it to %s or use --insecure-host-key: %w': bccdaedad65e3f18cec3fc820a87a8e0
+        SSH host key was not accepted: 3cfc731736f666d66b58528cef90710c
+        ? |
+            SSH jump-host chain: %v -> %s
+        : ac6b3fd99f2ceb68212c0752dd7b6aca
+        'SSH key authentication is unavailable: %v': a5c3a2f82c47937b444f390227328518
+        SSH password (unsafe; interactive authentication is recommended): 64dddc1d406eac4219ee1edaaa6c675c
+        'SSH reconnect failed: %v': aacabb470c38b67efde04665be87f7f0
+        SSH server IP %s is inside route subnet %s: aae3c96688ff518965c04807bdad8af7
+        SSH server IP address was not found: 12f5fbbc2527b358d2373d4aecc975e5
+        SSH server address is required: bc10b0754b65018f42cf041026f42e5a
+        SSH server has no IPv4 address: 142c8969d9d7cdff680760ddde1f2ff3
+        SSH server host must not be empty: 89a20ca1017c64cd0652290798a7439c
+        SSH server port: 5999a5387fd23cced2a6634efc499826
+        SSH target is required (user@host): 51f12ea396d0d730ca4c6df6cdeb9f91
+        SSH user name is required: b302395d47ac41e0f3311fa1d812799d
+        Service group: 7a48aecba8e943cfd33e1c1d668b2a4c
+        Service name: 608d0d96dde43669f91e795db58630e5
+        Service user: 0a9f3b0079c8611f9fca252be516d979
+        Shutdown signal received; closing proxy services...: 4703044b8165acb2961c96fd7b5fa919
+        'Skipping unavailable SSH agent %s: %v': 7eece921fe3efce32328396d88e16018
+        'Skipping unavailable SSH key %s: %v': 54596caae9d92b6ab30a157d2b7887bd
+        System proxy configured for HTTP %s: 46c360deef1cf4dea8e61dba53d33696
+        System proxy enabled: 1c1c7abe847b523f31aa69f63105a776
+        'System proxy integration is unavailable; continuing without it: %v': 6e49fd98d33bc8f80c2c85b1a400da26
+        System proxy settings restored: f6e06ca5f3d057125cb5df95fc0efb8f
+        TUN device CIDR: 7c739d50710becb79afb703bab234476
+        ? |
+            TUN mode enabled (CIDR: %s)
+        : 3fd65d16901cffab394202e57d6a817c
+        TUN mode requires an elevated Administrator console: a64640926bfd8733d7d0af701ec110c7
+        TUN mode requires root privileges; rerun ssh-tun as root: 745ae705e424ee7c914d5ee6039069e2
+        ? "The authenticity of host '%s' (%s) cannot be established.\n%s key fingerprint is SHA256:%s.\nContinue connecting (yes/no)? "
+        : a2df2dff0bef770a6ff78bf8bb330b2d
+        'Trying the configured SSH private key: %s': d0500305d562aba52948d0a2b940b2fe
+        Usage: c64518704ce0c0d5501a45763f464276
+        ? |-
+            Usage:
+              %s
+
+            Flags:
+            %s
+        : 2678f63144042ced83e2b4df808ebd31
+        Write a configuration template to a file, or - for stdout: fb44efdaa1876518a99abe7bf209c212
+        binary %q is not an executable regular file: f57caa1f2147a1592b4eb689cb8b46a8
+        client did not offer no-authentication method: 6b2f245e804bb84a58390e8eea95bb7b
+        configuration %q is not a regular file: e93367fa59e4bea55780451eb401f8d7
+        'configuration error: %w': 18ddd6b7094c5c9c43ce5b231256db32
+        connection rejected by routing rules: a80bbba057462549bc266f4e2457b45d
+        'create configuration directory: %w': 1806a5eaa672da76d7f8ad3d489897d8
+        'decode configuration: %w': 3f46bc3e545f794cf62c0518bd71a318
+        'decode configuration: multiple YAML documents are not allowed': bbe829c6dc33e549a73213d27d01d407
+        default gateway not found: 4734df4e0992ea55281e121dcd2dfa9f
+        empty domain name: 5250ae0fb63c757528f5a2365c199dfc
+        expected an IPv4 address: b886761aa5356a2cf5b66cb6aca8c9c7
+        'failed to accept a SOCKS5 connection: %w': 0d68d7ea1cda132812b69fd817e4ca5c
+        'failed to add NAT route %s: %w': 8a146f4aa097161ca0cb87d83e9d78e8
+        'failed to add SSH bypass route: %w': 20195b7bb04b8bb815c329bd8902fbd3
+        'failed to add protocol address: %v': 3e02c8b367d9ae120791d6f35122c9d5
+        'failed to add route %s: %w': 83ba246086ae5530774987dabd8f3ab1
+        'failed to add route 0.0.0.0/1: %w': 950d16f69e3e070f3be4ecbe8d68388a
+        'failed to add route 128.0.0.0/1: %w': 874eff133ea747353d2e37ae942492d0
+        'failed to configure TUN IP address: %w': 7b8e31822a6559bdc827d078f26ecee1
+        'failed to configure global routes: %w': 58633bc95b4e0bb2eb2d6163acd34503
+        'failed to configure routes: %w': 8b5c13c3186fbab579b4d4d517b0c269
+        'failed to configure the log file: %w': 80d0dbc85480faf97d77f61e98e203b1
+        'failed to connect to %s through an SSH jump host: %w': d0c1394e6e3054b79e3775d4610492be
+        'failed to create NIC: %v': 18fb95f997f7c1483bc07fb78e4f3cc2
+        'failed to create TUN device: %w': f68778dacfcf70e97bb9716f08306910
+        'failed to create known_hosts %q: %w': 790bb5d6e8149bdd02f8c0185324c078
+        'failed to create the known_hosts directory: %w': 84bcc45e98fd40f92a66d86ace3683af
+        'failed to create the log directory: %w': 424fef284c96c5da0ef11c05d135a034
+        'failed to decrypt private key %q: %w': 76441d50c2f68e790852e999a852e83d
+        'failed to determine the home directory for known_hosts: %w': 202f91779b62fdde80a9db82e317bc34
+        'failed to enable address spoofing: %v': db204655928cf93344f910038cc9b75b
+        'failed to enable promiscuous mode: %v': 341a4ffbc343927158a88e21965b1401
+        'failed to establish an SSH connection to %s through a jump host: %w': 796ff5e41d721db56c9c6eb8fa9a0b85
+        'failed to expand the ~ path: %w': 0618e5708a7b69b8d6f8f9e4a1d18244
+        'failed to expand the known_hosts path: %w': 2eddf7985ee2494da3a080b18690271e
+        'failed to get the SSH password: %w': 346766616b0c590792bb45ad12a294e5
+        'failed to get the default gateway: %w': ba0601f1b4638c58298a5c0c85de62a7
+        'failed to initialize the HTTP proxy: %w': 021f29a5404379d3e9e02120b1dd8bca
+        'failed to initialize the SOCKS5 proxy: %w': b2bd2e0fe1f24c192b601c7078fc5809
+        'failed to initialize the TUN service: %w': a9ce176e0e9a3b4a04110e5ad47674bc
+        'failed to load known_hosts %q: %w': 787ca18ce4d2fb20bfdc65d0357c1f6b
+        'failed to load the configured SSH private key: %w': e4f5cc3cb481963130436fb79879e45b
+        'failed to load the routing rules file: %w': c47dcedcb0a2426e3bf55b745a96e9c2
+        'failed to open known_hosts %q: %w': 1eafbf6a327b9a518a8c558eb3765631
+        'failed to open the log file: %w': 84ad0db443c043f5a7e0a03ede06f964
+        'failed to parse private key %q: %w': 61147cf4fdd5ab6f3392fb8c44645aec
+        'failed to parse the YAML routing rules file: %w': c33a7e3e020c63e9291efbfd812969ad
+        'failed to read host-key confirmation: %w': 8c6f6f60dca9feef0d8708f198920d30
+        'failed to read private key file %q: %w': 8da693b549c9b28127666f1500f56a0c
+        'failed to read routing rules file: %w': d3a09866ea26f9a189b25ca9f350048d
+        'failed to read the password: %w': 5975889afda4ccf574534d6384df426f
+        'failed to remove route %v: %s: %w': b01f03d29a0769046588f347f2048014
+        'failed to resolve the SSH server IP address: %w': 3a3f2b2696e5b402b24c580d4243b0eb
+        'failed to save system proxy settings: %w': dd83046e5c8376622efe3aee440ad1ac
+        'failed to save the SSH host key: %w': 9d09b536ea9c80b471ddbaeceac9007e
+        failed to select a peer address in subnet %s: d84d211e3e387dc00b2ca28ba7509b8f
+        'failed to start the HTTP proxy: %w': 9737c23a61ea4418ed879c74b04c87c3
+        'failed to start the SOCKS5 proxy: %w': 1a00f771fb67d7589e97c0d924ee1367
+        'failed to start the TUN service: %w': 111873e468f3cf4f59b77cae03cd3141
+        'gsettings %s: %s: %w': 970c8a07afc6df9dfec3bdc82183033f
+        'gsettings get %s %s: %s: %w': 8addaaeb5e0fedf6cb70924cf3edf0cb
+        help for ssh-tun: c07a1ed1dbf1df4d5a02c05cadb795a8
+        host and port must not be empty: 091f37abd439c3e60d0d5c382cbc6512
+        'invalid HTTP proxy address: %w': dd927ad0fc7b904009fc2aa1813cdacd
+        'invalid IPv4 TUN CIDR: %s': b006e848fbdaa26e435a9f0ae67dcd7c
+        'invalid IPv4 TUN route: %s': 445acfa85d01c9371a85108cf9109f34
+        'invalid IPv4 address or CIDR: %s': 3d95906178f195be4479191130876706
+        'invalid IPv4 mask in TUN CIDR: %s': ea72d507cc55c05630ec9480054139de
+        'invalid IPv6 address: %s': e9e947faca049b51879b46e49a9886bb
+        invalid NAT rule %q; expected Src:Dst: 1005151251890188f8e9b8795d2c8e43
+        'invalid SOCKS5 proxy address: %w': 5477b964840ee1542860812d858281bd
+        invalid SOCKS5 request header: 24a284622848a7f9cf83e46b7987d3d9
+        'invalid SSH jump host: %w': 6f5e65b901b84470c58ce99e9fdac3ec
+        'invalid SSH jump-host format: %s': b998ab0aeb5c1e4d8d1afec0050a9288
+        'invalid SSH port: %s': 2d7d761ec5d698a57a9db6ed67f2f6c0
+        'invalid SSH server address: %s': 0c7984415b688985e26ca62ef9658c04
+        invalid SSH target; expected user@host: 9a27a9c9c737445144d086e5cc8d8194
+        'invalid TCP port: %s': 5d37bc41fc665e4a4b9686e316df3475
+        'invalid TUN CIDR %s: %w': dcf7f4d1b3b3eec54d877a3b6f7cf57a
+        'invalid host:port value %s: %w': d8d6752a3e8328692612d8597b97bc70
+        invalid service group %q: 29b1e5484b5386be3c493dcf3e043112
+        'invalid service manager: %s': 6e94ef2d55b82a2ddca8539bf424b3dd
+        invalid service name %q: d6b962c01f3a2111f34aa0660bfc3e62
+        invalid service user %q: 3fc3fcebb33e53bc4dcde2ee41627ca8
+        'invalid ssh.keepalive_interval: %w': d64bd769ffdd7d3f314184595443a746
+        'invalid ssh.reconnect_interval: %w': b1266ab84344cd0d4664c2e4bb662419
+        'invalid ssh.timeout: %w': a50f56c387c2ba1cd72af50f85ed9836
+        'invalid upstream HTTP server address: %w': d2e51898abf66561a160ea776cf44204
+        'ip %s: %s: %w': f27b085f5cb284c903a07d0b7f6c0f27
+        'ip addr add: %s: %w': 1c346ecfb813ca2e68c3ea000ccbfb27
+        'ip link set: %s: %w': 12e2701306230d98c04b53405a916fb4
+        keepalive interval must be greater than zero: beeb8c65b5a8485c3de607bfd1d9fdf6
+        'known_hosts file (default: ~/.ssh/known_hosts)': cee7e5e6bdcc9e56df27d5a095e65789
+        negative IPv4 address offset: cfb65d10800d5075c1866acb3e988d28
+        no SSH authentication methods are available: 946ace9c8d4fba19f92f4586aec81963
+        no SSH private keys were found: 79a53b8743665915323cade2d8be8aba
+        no password was configured and interactive authentication is disabled: 66056a488cbb725e5f5cf6a1550b01a7
+        no password was configured and interactive authentication is unavailable: c56f0a7f4746b230b6112f0bb6ba9b93
+        'only IPv4 TUN addresses are supported: %s': fd50588f1d21cd77b82199d87ea2fffa
+        'open configuration: %w': 1c51a751cacc117f81bdb94d6a01901e
+        private key %q is passphrase-protected; load it into ssh-agent or enable interactive authentication: 09f0cce22e9bca951821093ca6f6ab35
+        reconnect interval must be greater than zero: f1627743183117e8b8ca258c7033e40c
+        replacement SSH client is not ready: 65a06d29d8f52acf1aabb58078982aa2
+        routing rules line %d contains a CIDR of the wrong IP version: 563d9d1769b4a0c08cc3210dc1001269
+        routing rules line %d contains an empty value: a6f76ad15d55dcbbab29b7a4a48ca281
+        'routing rules line %d contains an invalid CIDR: %w': 2a2a67408c537944bbca2b1f106bae6b
+        'routing rules line %d contains an unknown action: %s': 2c15f79a62bacde726310d7d4bcda432
+        'routing rules line %d contains an unknown rule type: %s': e358baa27761077a07b0940de2354af7
+        routing rules line %d has an invalid format: 1c2c11ee3fc68a0da0c31a2f46ffee9e
+        routing rules line %d must use MATCH,,ACTION: 9a6349ff401e1ee1a3343e7b9e8b5a75
+        routing rules path must not be empty: 1df1fce3bd31d6007220b9d07af870f4
+        service %q already exists; use --service-force: 13f19d673c9a9d413827d3b7ce9a2999
+        service file %s already exists; use --service-force: 86bb6c0b8d58d9db860f2163638d2201
+        service management requires an elevated Administrator console: 848da324318e2d580f1b4eb234e9e9e6
+        service management requires root privileges: 700d24c46e547a2c9da3805ccaec948e
+        'source and destination prefix lengths differ: %d and %d': 5bee2d77976fb786d723345640b2029f
+        ssh-tun %s is starting...: 2972eb1382c3521b101fc4a620f26d9c
+        ? |-
+            ssh-tun is a command-line HTTP, SOCKS5, and TUN proxy over SSH.
+            It provides secure access to private networks or uses a remote host as an Internet gateway.
+        : ea441571d621fcfec19de09d8014e4a5
+        systemd or OpenRC was not detected: fae8ec72d1af8a4bd59ac23f1937c12e
+        timeout must be greater than zero: 2dc23af4879a09a0f22307dd7eab4c30
+        'unknown routing mode: %s': 901e72d1fc724bd3a3ddc99248fd65b5
+        'unsupported SOCKS version: %d': 57a697de433c68acaaa5ad958add3268
+        unsupported Windows service manager %q: 99558726b769528d39a3730a7bdca668
+        'unsupported address type: %d': 5a7935b0974a3758fc29262810f07635
+        'unsupported command: %d': f8755e4424988401dec202f71b311bac
+        unsupported configuration version %d: 9b1f4a4f146c9fba197c853378a594ca
+        unsupported service manager %q: b43170f91f605c6370d0941dcd49f4c6
+        user name and host must not be empty: 7f60c17a978b666154834985cc735252
+        version for ssh-tun: b864e01caf8b5236e9b0d99ab3e86594
+        'write configuration template: %w': 5f551b2291355ba785eb7c0588cb71da
+        'write service file: %w': 6db661d574a8f914e2085829a566b15e

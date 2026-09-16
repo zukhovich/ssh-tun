@@ -29,7 +29,6 @@ var (
 	cfg            = config.NewConfig()
 	aliasFlags     []string
 	configPath     string
-	language       string
 	writeConfig    string
 	installService string
 	removeService  string
@@ -43,13 +42,10 @@ var (
 var rootCmd = &cobra.Command{
 	Use:     "ssh-tun [user@host]",
 	Version: Version,
-	Short:   i18n.T(i18n.AppShort),
-	Long:    i18n.T(i18n.AppLong),
+	Short:   i18n.T("Lightweight SSH-based HTTP proxy"),
+	Long:    i18n.T("ssh-tun is a command-line HTTP, SOCKS5, and TUN proxy over SSH.\nIt provides secure access to private networks or uses a remote host as an Internet gateway."),
 	Args:    cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if err := i18n.Set(language); err != nil {
-			return err
-		}
 		if writeConfig != "" {
 			template := config.Template(runtime.GOOS)
 			if writeConfig == "-" {
@@ -57,26 +53,20 @@ var rootCmd = &cobra.Command{
 				return nil
 			}
 			if err := os.MkdirAll(filepath.Dir(writeConfig), 0700); err != nil {
-				return fmt.Errorf("create configuration directory: %w", err)
+				return fmt.Errorf(i18n.T("create configuration directory: %w"), err)
 			}
 			if err := os.WriteFile(writeConfig, []byte(template), 0600); err != nil {
-				return fmt.Errorf("write configuration template: %w", err)
+				return fmt.Errorf(i18n.T("write configuration template: %w"), err)
 			}
 			return nil
 		}
 		if installService != "" || removeService != "" {
 			if configPath == "" {
-				return fmt.Errorf("--config is required for service management")
+				return errors.New(i18n.T("--config is required for service management"))
 			}
-			serviceConfig, fileLanguage, _, err := config.LoadFile(configPath)
+			serviceConfig, _, err := config.LoadFile(configPath)
 			if err != nil {
 				return err
-			}
-			if !cmd.Flags().Changed("lang") && fileLanguage != "" {
-				language = fileLanguage
-				if err := i18n.Set(language); err != nil {
-					return err
-				}
 			}
 			manager := installService
 			if manager == "" {
@@ -102,12 +92,12 @@ var rootCmd = &cobra.Command{
 			if installService != "" {
 				manager, err = service.Install(options)
 				if err == nil {
-					fmt.Println(i18n.T(i18n.ServiceInstalled, manager, serviceName))
+					fmt.Printf(i18n.T("%s service %q installed\n"), manager, serviceName)
 				}
 			} else {
 				manager, err = service.Remove(options)
 				if err == nil {
-					fmt.Println(i18n.T(i18n.ServiceRemoved, manager, serviceName))
+					fmt.Printf(i18n.T("%s service %q removed\n"), manager, serviceName)
 				}
 			}
 			return err
@@ -116,22 +106,16 @@ var rootCmd = &cobra.Command{
 		cliConfig := *cfg
 		cliAliases := append([]string(nil), aliasFlags...)
 		if configPath != "" {
-			fileConfig, fileLanguage, fileAliases, err := config.LoadFile(configPath)
+			fileConfig, fileAliases, err := config.LoadFile(configPath)
 			if err != nil {
 				return err
-			}
-			if !cmd.Flags().Changed("lang") && fileLanguage != "" {
-				language = fileLanguage
-				if err := i18n.Set(language); err != nil {
-					return err
-				}
 			}
 			cfg = fileConfig
 			aliasFlags = fileAliases
 			applyCLIOverrides(cmd, cfg, &cliConfig, &aliasFlags, cliAliases)
 		}
 		if len(args) == 0 && cfg.SSHServer == "" {
-			return errors.New(i18n.Text("SSH target is required (user@host)", "необходимо указать SSH-цель (user@host)"))
+			return errors.New(i18n.T("SSH target is required (user@host)"))
 		}
 		// Enable TUN automatically when global routing, routes, or NAT is configured.
 		if cfg.TunGlobal || len(cfg.TunRoute) > 0 || len(aliasFlags) > 0 {
@@ -139,11 +123,7 @@ var rootCmd = &cobra.Command{
 		}
 
 		if needsElevation(cfg.TunMode) {
-			fmt.Println(i18n.Text("TUN mode requires elevated privileges. Restarting...", "Для TUN-режима нужны повышенные привилегии. Перезапуск..."))
-			if err := relaunchElevated(); err != nil {
-				return err
-			}
-			return nil
+			return elevationError()
 		}
 
 		// Resolve the SSH user and server from CLI or configuration.
@@ -181,18 +161,18 @@ var rootCmd = &cobra.Command{
 
 		// Validate the resolved configuration.
 		if err := cfg.Validate(); err != nil {
-			return fmt.Errorf(i18n.Text("configuration error: %w", "ошибка конфигурации: %w"), err)
+			return fmt.Errorf(i18n.T("configuration error: %w"), err)
 		}
 
 		log := logger.NewLogger(cfg.Verbose)
 		defer log.Close()
 		if cfg.LogFile != "" {
 			if err := log.SetLogFile(cfg.LogFile); err != nil {
-				return fmt.Errorf(i18n.Text("failed to configure the log file: %w", "не удалось настроить файл журнала: %w"), err)
+				return fmt.Errorf(i18n.T("failed to configure the log file: %w"), err)
 			}
-			log.Infof(i18n.Text("Logs will also be written to: %s", "Журнал также будет записываться в файл: %s"), cfg.LogFile)
+			log.Infof(i18n.T("Logs will also be written to: %s"), cfg.LogFile)
 		}
-		log.Infof(i18n.Text("ssh-tun %s is starting...", "ssh-tun %s запускается..."), Version)
+		log.Infof(i18n.T("ssh-tun %s is starting..."), Version)
 
 		// Initialize routing rules.
 		var r *router.Router
@@ -200,15 +180,15 @@ var rootCmd = &cobra.Command{
 			var err error
 			r, err = router.NewRouter(cfg.RuleFile)
 			if err != nil {
-				return fmt.Errorf(i18n.Text("failed to load the routing rules file: %w", "не удалось загрузить файл правил маршрутизации: %w"), err)
+				return fmt.Errorf(i18n.T("failed to load the routing rules file: %w"), err)
 			}
-			log.Infof(i18n.Text("Loaded routing rules file: %s", "Загружен файл правил маршрутизации: %s"), cfg.RuleFile)
+			log.Infof(i18n.T("Loaded routing rules file: %s"), cfg.RuleFile)
 		}
 
 		// Initialize the SSH connection with optional auto-reconnect.
 		supervisor, err := proxy.NewSupervisor(cfg, log)
 		if err != nil {
-			return fmt.Errorf(i18n.Text("SSH connection error: %w", "ошибка SSH-подключения: %w"), err)
+			return fmt.Errorf(i18n.T("SSH connection error: %w"), err)
 		}
 		defer supervisor.Close()
 		sshClient := supervisor.SSH()
@@ -216,7 +196,7 @@ var rootCmd = &cobra.Command{
 		// Initialize the HTTP proxy.
 		httpProxy, err := proxy.NewHTTPOverSSH(cfg, log, sshClient, r)
 		if err != nil {
-			return fmt.Errorf(i18n.Text("failed to initialize the HTTP proxy: %w", "ошибка инициализации HTTP-прокси: %w"), err)
+			return fmt.Errorf(i18n.T("failed to initialize the HTTP proxy: %w"), err)
 		}
 
 		// Initialize the SOCKS5 proxy.
@@ -224,7 +204,7 @@ var rootCmd = &cobra.Command{
 		if cfg.SocksAddr != "" {
 			socksProxy, err = proxy.NewSOCKS5OverSSH(cfg, log, sshClient, r)
 			if err != nil {
-				return fmt.Errorf(i18n.Text("failed to initialize the SOCKS5 proxy: %w", "ошибка инициализации SOCKS5-прокси: %w"), err)
+				return fmt.Errorf(i18n.T("failed to initialize the SOCKS5 proxy: %w"), err)
 			}
 		}
 
@@ -238,14 +218,14 @@ var rootCmd = &cobra.Command{
 		if cfg.TunMode {
 			tunService, err = tun.NewTunService(cfg, log, sshClient, r)
 			if err != nil {
-				return fmt.Errorf(i18n.Text("failed to initialize the TUN service: %w", "ошибка инициализации TUN-сервиса: %w"), err)
+				return fmt.Errorf(i18n.T("failed to initialize the TUN service: %w"), err)
 			}
 		}
 
 		// Configure TUN first so startup failures cannot leave the system proxy enabled.
 		if tunService != nil {
 			if err := tunService.Start(); err != nil {
-				return fmt.Errorf(i18n.Text("failed to start the TUN service: %w", "не удалось запустить TUN-сервис: %w"), err)
+				return fmt.Errorf(i18n.T("failed to start the TUN service: %w"), err)
 			}
 			defer tunService.Close()
 		}
@@ -285,60 +265,60 @@ var rootCmd = &cobra.Command{
 		systemProxyEnabled := false
 		if cfg.SystemProxy && proxyMgr != nil {
 			if err := proxyMgr.Enable(); err != nil {
-				log.Warnf(i18n.Text("System proxy integration is unavailable; continuing without it: %v", "Интеграция с системным прокси недоступна; работа продолжается без неё: %v"), err)
+				log.Warnf(i18n.T("System proxy integration is unavailable; continuing without it: %v"), err)
 			} else {
 				systemProxyEnabled = true
 				defer proxyMgr.Disable()
 			}
 		}
 
-		fmt.Println("\n" + i18n.T(i18n.Started) + ":")
-		fmt.Println(i18n.Text("HTTP proxy:", "HTTP-прокси:"), "http://"+cfg.ListenAddr)
+		fmt.Println("\n" + i18n.T("Proxy service started") + ":")
+		fmt.Println(i18n.T("HTTP proxy:"), "http://"+cfg.ListenAddr)
 		if cfg.SocksAddr != "" {
-			fmt.Println(i18n.Text("SOCKS5 proxy:", "SOCKS5-прокси:"), "socks5://"+cfg.SocksAddr)
+			fmt.Println(i18n.T("SOCKS5 proxy:"), "socks5://"+cfg.SocksAddr)
 		}
 		if cfg.TunMode {
-			fmt.Printf(i18n.Text("TUN mode enabled (CIDR: %s)\n", "TUN-режим включён (CIDR: %s)\n"), cfg.TunCIDR)
+			fmt.Printf(i18n.T("TUN mode enabled (CIDR: %s)\n"), cfg.TunCIDR)
 		}
 
 		if len(cfg.JumpHosts) > 0 {
-			fmt.Printf(i18n.Text("SSH jump-host chain: %v -> %s\n", "Цепочка промежуточных SSH-узлов: %v -> %s\n"), cfg.JumpHosts, cfg.SSHServer)
+			fmt.Printf(i18n.T("SSH jump-host chain: %v -> %s\n"), cfg.JumpHosts, cfg.SSHServer)
 		} else {
-			fmt.Println(i18n.Text("Direct connection to SSH server:", "Прямое подключение к SSH-серверу:"), cfg.SSHServer)
+			fmt.Println(i18n.T("Direct connection to SSH server:"), cfg.SSHServer)
 		}
 		if systemProxyEnabled {
-			fmt.Println(i18n.Text("System proxy enabled", "Системный прокси включён"))
+			fmt.Println(i18n.T("System proxy enabled"))
 		}
 		if cfg.RuleFile != "" {
-			fmt.Println(i18n.Text("Custom routing rules enabled:", "Пользовательские правила маршрутизации включены:"), cfg.RuleFile)
+			fmt.Println(i18n.T("Custom routing rules enabled:"), cfg.RuleFile)
 		}
 		if cfg.AutoReconnect {
-			fmt.Println(i18n.Text("Auto-reconnect enabled", "Автоматическое переподключение включено"))
+			fmt.Println(i18n.T("Auto-reconnect enabled"))
 		}
-		fmt.Println(i18n.T(i18n.PressExit))
+		fmt.Println(i18n.T("Press Ctrl+C to exit"))
 
 		<-sigChan
-		log.Info(i18n.Text("Shutdown signal received; closing proxy services...", "Получен сигнал, закрытие прокси-сервисов..."))
+		log.Info(i18n.T("Shutdown signal received; closing proxy services..."))
 
 		if systemProxyEnabled && proxyMgr != nil {
 			if err := proxyMgr.Disable(); err != nil {
-				log.Errorf(i18n.Text("Failed to restore system proxy settings: %v", "Не удалось восстановить настройки системного прокси: %v"), err)
+				log.Errorf(i18n.T("Failed to restore system proxy settings: %v"), err)
 			}
 		}
 
 		if err := httpProxy.Close(); err != nil {
-			log.Errorf(i18n.Text("Failed to close the HTTP proxy: %v", "Не удалось закрыть HTTP-прокси: %v"), err)
+			log.Errorf(i18n.T("Failed to close the HTTP proxy: %v"), err)
 		}
 
 		if socksProxy != nil {
 			if err := socksProxy.Close(); err != nil {
-				log.Errorf(i18n.Text("Failed to close the SOCKS5 proxy: %v", "Не удалось закрыть SOCKS5-прокси: %v"), err)
+				log.Errorf(i18n.T("Failed to close the SOCKS5 proxy: %v"), err)
 			}
 		}
 
 		if tunService != nil {
 			if err := tunService.Close(); err != nil {
-				log.Errorf(i18n.Text("Failed to close the TUN service: %v", "Не удалось закрыть TUN-сервис: %v"), err)
+				log.Errorf(i18n.T("Failed to close the TUN service: %v"), err)
 			}
 		}
 
@@ -348,51 +328,49 @@ var rootCmd = &cobra.Command{
 
 // init defines command-line flags.
 func init() {
-	language = "en"
-	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", i18n.T(i18n.FlagConfig))
-	rootCmd.PersistentFlags().StringVar(&language, "lang", language, i18n.T(i18n.FlagLanguage))
-	rootCmd.PersistentFlags().StringVar(&writeConfig, "write-config", "", "Write a configuration template to a file, or - for stdout")
-	rootCmd.PersistentFlags().StringVar(&installService, "install-service", "", i18n.T(i18n.FlagServiceInstall))
-	rootCmd.PersistentFlags().StringVar(&removeService, "remove-service", "", i18n.T(i18n.FlagServiceRemove))
-	rootCmd.PersistentFlags().StringVar(&serviceName, "service-name", "ssh-tun", i18n.T(i18n.FlagServiceName))
-	rootCmd.PersistentFlags().StringVar(&serviceUser, "service-user", "root", i18n.T(i18n.FlagServiceUser))
-	rootCmd.PersistentFlags().StringVar(&serviceGroup, "service-group", "root", i18n.T(i18n.FlagServiceGroup))
-	rootCmd.PersistentFlags().BoolVar(&serviceForce, "service-force", false, "Overwrite an existing service definition")
+	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", i18n.T("Path to the YAML configuration file"))
+	rootCmd.PersistentFlags().StringVar(&writeConfig, "write-config", "", i18n.T("Write a configuration template to a file, or - for stdout"))
+	rootCmd.PersistentFlags().StringVar(&installService, "install-service", "", i18n.T("Install a service using auto, systemd, or openrc"))
+	rootCmd.PersistentFlags().StringVar(&removeService, "remove-service", "", i18n.T("Remove a service using auto, systemd, or openrc"))
+	rootCmd.PersistentFlags().StringVar(&serviceName, "service-name", "ssh-tun", i18n.T("Service name"))
+	rootCmd.PersistentFlags().StringVar(&serviceUser, "service-user", "root", i18n.T("Service user"))
+	rootCmd.PersistentFlags().StringVar(&serviceGroup, "service-group", "root", i18n.T("Service group"))
+	rootCmd.PersistentFlags().BoolVar(&serviceForce, "service-force", false, i18n.T("Overwrite an existing service definition"))
 	// SSH options.
-	rootCmd.PersistentFlags().StringVarP(&cfg.SSHPort, "port", "p", "22", i18n.T(i18n.FlagSSHPort))
-	rootCmd.PersistentFlags().StringVar(&cfg.SSHPassword, "pass", "", i18n.T(i18n.FlagPassword))
-	rootCmd.PersistentFlags().StringVarP(&cfg.SSHKeyFile, "identity-file", "i", "", i18n.T(i18n.FlagIdentity))
-	rootCmd.PersistentFlags().StringVar(&cfg.SSHKeyFile, "identity_file", "", "Deprecated: use --identity-file")
+	rootCmd.PersistentFlags().StringVarP(&cfg.SSHPort, "port", "p", "22", i18n.T("SSH server port"))
+	rootCmd.PersistentFlags().StringVar(&cfg.SSHPassword, "pass", "", i18n.T("SSH password (unsafe; interactive authentication is recommended)"))
+	rootCmd.PersistentFlags().StringVarP(&cfg.SSHKeyFile, "identity-file", "i", "", i18n.T("Private key file"))
+	rootCmd.PersistentFlags().StringVar(&cfg.SSHKeyFile, "identity_file", "", i18n.T("Deprecated: use --identity-file"))
 	_ = rootCmd.PersistentFlags().MarkHidden("identity_file")
-	rootCmd.PersistentFlags().StringVar(&cfg.KnownHostsFile, "known-hosts", "", i18n.T(i18n.FlagKnownHosts))
-	rootCmd.PersistentFlags().BoolVar(&cfg.InsecureHostKey, "insecure-host-key", false, i18n.T(i18n.FlagInsecure))
-	rootCmd.PersistentFlags().StringSliceVarP(&cfg.JumpHosts, "jump", "J", []string{}, i18n.T(i18n.FlagJump))
-	rootCmd.PersistentFlags().DurationVar(&cfg.Timeout, "timeout", 10*time.Second, i18n.T(i18n.FlagTimeout))
-	rootCmd.PersistentFlags().BoolVar(&cfg.AutoReconnect, "auto-reconnect", false, "Reconnect automatically when the SSH channel is lost")
-	rootCmd.PersistentFlags().DurationVar(&cfg.ReconnectInterval, "reconnect-interval", 5*time.Second, "Delay between SSH reconnect attempts")
-	rootCmd.PersistentFlags().DurationVar(&cfg.KeepAliveInterval, "keepalive-interval", 15*time.Second, "SSH channel health-check interval")
+	rootCmd.PersistentFlags().StringVar(&cfg.KnownHostsFile, "known-hosts", "", i18n.T("known_hosts file (default: ~/.ssh/known_hosts)"))
+	rootCmd.PersistentFlags().BoolVar(&cfg.InsecureHostKey, "insecure-host-key", false, i18n.T("Disable SSH host key verification (unsafe)"))
+	rootCmd.PersistentFlags().StringSliceVarP(&cfg.JumpHosts, "jump", "J", []string{}, i18n.T("Comma-separated SSH jump hosts (user@host:port)"))
+	rootCmd.PersistentFlags().DurationVar(&cfg.Timeout, "timeout", 10*time.Second, i18n.T("Connection timeout"))
+	rootCmd.PersistentFlags().BoolVar(&cfg.AutoReconnect, "auto-reconnect", false, i18n.T("Reconnect automatically when the SSH channel is lost"))
+	rootCmd.PersistentFlags().DurationVar(&cfg.ReconnectInterval, "reconnect-interval", 5*time.Second, i18n.T("Delay between SSH reconnect attempts"))
+	rootCmd.PersistentFlags().DurationVar(&cfg.KeepAliveInterval, "keepalive-interval", 15*time.Second, i18n.T("SSH channel health-check interval"))
 
 	// Proxy options.
-	rootCmd.PersistentFlags().StringVarP(&cfg.ListenAddr, "listen", "l", ":8080", i18n.T(i18n.FlagListen))
-	rootCmd.PersistentFlags().StringVar(&cfg.ListenAddr, "http", ":8080", i18n.T(i18n.FlagHTTP))
-	rootCmd.PersistentFlags().StringVar(&cfg.SocksAddr, "socks5", "", i18n.T(i18n.FlagSOCKS))
-	rootCmd.PersistentFlags().BoolVar(&cfg.SystemProxy, "sys-proxy", false, i18n.T(i18n.FlagSysProxy))
-	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "http-upstream", "", i18n.T(i18n.FlagUpstream))
+	rootCmd.PersistentFlags().StringVarP(&cfg.ListenAddr, "listen", "l", ":8080", i18n.T("Local HTTP proxy address (deprecated; use --http)"))
+	rootCmd.PersistentFlags().StringVar(&cfg.ListenAddr, "http", ":8080", i18n.T("Local HTTP proxy address"))
+	rootCmd.PersistentFlags().StringVar(&cfg.SocksAddr, "socks5", "", i18n.T("SOCKS5 proxy address (for example :1080)"))
+	rootCmd.PersistentFlags().BoolVar(&cfg.SystemProxy, "sys-proxy", false, i18n.T("Configure and restore the GNOME system proxy"))
+	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "http-upstream", "", i18n.T("Force HTTP requests through an upstream host:port"))
 	// Keep the legacy target option hidden for compatibility.
-	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "target", "", "Deprecated: use --http-upstream")
+	rootCmd.PersistentFlags().StringVar(&cfg.HTTPUpstream, "target", "", i18n.T("Deprecated: use --http-upstream"))
 	rootCmd.PersistentFlags().MarkHidden("target")
 
 	// TUN options.
-	rootCmd.PersistentFlags().BoolVar(&cfg.TunMode, "tun", false, i18n.T(i18n.FlagTUN))
-	rootCmd.PersistentFlags().BoolVarP(&cfg.TunGlobal, "tun-global", "g", false, i18n.T(i18n.FlagTUNGlobal))
-	rootCmd.PersistentFlags().StringVar(&cfg.TunCIDR, "tun-ip", "10.0.0.1/24", i18n.T(i18n.FlagTUNIP))
-	rootCmd.PersistentFlags().StringSliceVar(&cfg.TunRoute, "tun-route", []string{}, i18n.T(i18n.FlagTUNRoute))
-	rootCmd.PersistentFlags().StringSliceVar(&aliasFlags, "tun-nat", []string{}, i18n.T(i18n.FlagTUNNAT))
+	rootCmd.PersistentFlags().BoolVar(&cfg.TunMode, "tun", false, i18n.T("Enable TUN mode"))
+	rootCmd.PersistentFlags().BoolVarP(&cfg.TunGlobal, "tun-global", "g", false, i18n.T("Route all traffic through TUN"))
+	rootCmd.PersistentFlags().StringVar(&cfg.TunCIDR, "tun-ip", "10.0.0.1/24", i18n.T("TUN device CIDR"))
+	rootCmd.PersistentFlags().StringSliceVar(&cfg.TunRoute, "tun-route", []string{}, i18n.T("Add a static TUN route (repeatable)"))
+	rootCmd.PersistentFlags().StringSliceVar(&aliasFlags, "tun-nat", []string{}, i18n.T("NAT mapping in SrcCIDR:DstCIDR format"))
 
 	// General options.
-	rootCmd.PersistentFlags().BoolVarP(&cfg.Verbose, "verbose", "v", false, i18n.T(i18n.FlagVerbose))
-	rootCmd.PersistentFlags().StringVar(&cfg.LogFile, "log", "", i18n.T(i18n.FlagLog))
-	rootCmd.PersistentFlags().StringVar(&cfg.RuleFile, "rules", "", i18n.T(i18n.FlagRules))
+	rootCmd.PersistentFlags().BoolVarP(&cfg.Verbose, "verbose", "v", false, i18n.T("Enable verbose logging"))
+	rootCmd.PersistentFlags().StringVar(&cfg.LogFile, "log", "", i18n.T("Log file path"))
+	rootCmd.PersistentFlags().StringVar(&cfg.RuleFile, "rules", "", i18n.T("Routing rules file"))
 }
 
 func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]string, cliAliases []string) {
@@ -430,7 +408,7 @@ func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]s
 func Execute(version string) {
 	Version = version
 	rootCmd.Version = version
-	bootstrapLanguage()
+	i18n.Init("")
 	localizeCLI()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -438,64 +416,51 @@ func Execute(version string) {
 	}
 }
 
-func bootstrapLanguage() {
-	args := os.Args[1:]
-	for index, arg := range args {
-		if arg == "--lang" && index+1 < len(args) {
-			language = args[index+1]
-		}
-		if strings.HasPrefix(arg, "--lang=") {
-			language = strings.TrimPrefix(arg, "--lang=")
-		}
-	}
-	_ = i18n.Set(language)
-}
-
 func localizeCLI() {
 	rootCmd.InitDefaultHelpFlag()
 	rootCmd.InitDefaultVersionFlag()
-	rootCmd.Short, rootCmd.Long = i18n.T(i18n.AppShort), i18n.T(i18n.AppLong)
+	rootCmd.Short, rootCmd.Long = i18n.T("Lightweight SSH-based HTTP proxy"), i18n.T("ssh-tun is a command-line HTTP, SOCKS5, and TUN proxy over SSH.\nIt provides secure access to private networks or uses a remote host as an Internet gateway.")
 	rootCmd.SetUsageFunc(func(cmd *cobra.Command) error {
-		language := i18n.Language()
-		usage, flags := "Usage", "Flags"
-		if language == "ru" {
-			usage, flags = "Использование", "Флаги"
-		}
+		usage, flags := i18n.T("Usage"), i18n.T("Flags")
 		fmt.Fprintf(cmd.OutOrStderr(), "%s:\n  %s\n\n%s:\n%s", usage, cmd.UseLine(), flags, cmd.LocalFlags().FlagUsages())
 		return nil
 	})
 	rootCmd.SetHelpFunc(func(cmd *cobra.Command, _ []string) {
 		fmt.Fprintln(cmd.OutOrStdout(), cmd.Long)
 		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintf(cmd.OutOrStdout(), i18n.Text("Usage:\n  %s\n\nFlags:\n%s", "Использование:\n  %s\n\nФлаги:\n%s"), cmd.UseLine(), cmd.LocalFlags().FlagUsages())
+		fmt.Fprintf(cmd.OutOrStdout(), i18n.T("Usage:\n  %s\n\nFlags:\n%s"), cmd.UseLine(), cmd.LocalFlags().FlagUsages())
 	})
-	usages := map[string]i18n.ID{
-		"config": i18n.FlagConfig, "lang": i18n.FlagLanguage, "install-service": i18n.FlagServiceInstall,
-		"remove-service": i18n.FlagServiceRemove, "service-name": i18n.FlagServiceName, "service-user": i18n.FlagServiceUser,
-		"service-group": i18n.FlagServiceGroup, "port": i18n.FlagSSHPort, "pass": i18n.FlagPassword,
-		"identity-file": i18n.FlagIdentity, "known-hosts": i18n.FlagKnownHosts, "insecure-host-key": i18n.FlagInsecure,
-		"jump": i18n.FlagJump, "timeout": i18n.FlagTimeout, "listen": i18n.FlagListen, "http": i18n.FlagHTTP,
-		"socks5": i18n.FlagSOCKS, "sys-proxy": i18n.FlagSysProxy, "http-upstream": i18n.FlagUpstream,
-		"tun": i18n.FlagTUN, "tun-global": i18n.FlagTUNGlobal, "tun-ip": i18n.FlagTUNIP,
-		"tun-route": i18n.FlagTUNRoute, "tun-nat": i18n.FlagTUNNAT, "verbose": i18n.FlagVerbose,
-		"log": i18n.FlagLog, "rules": i18n.FlagRules,
+	usages := map[string]string{
+		"config":          i18n.T("Path to the YAML configuration file"),
+		"install-service": i18n.T("Install a service using auto, systemd, or openrc"), "remove-service": i18n.T("Remove a service using auto, systemd, or openrc"),
+		"service-name": i18n.T("Service name"), "service-user": i18n.T("Service user"), "service-group": i18n.T("Service group"),
+		"port": i18n.T("SSH server port"), "pass": i18n.T("SSH password (unsafe; interactive authentication is recommended)"),
+		"identity-file": i18n.T("Private key file"), "known-hosts": i18n.T("known_hosts file (default: ~/.ssh/known_hosts)"),
+		"insecure-host-key": i18n.T("Disable SSH host key verification (unsafe)"), "jump": i18n.T("Comma-separated SSH jump hosts (user@host:port)"),
+		"timeout": i18n.T("Connection timeout"), "listen": i18n.T("Local HTTP proxy address (deprecated; use --http)"),
+		"http": i18n.T("Local HTTP proxy address"), "socks5": i18n.T("SOCKS5 proxy address (for example :1080)"),
+		"sys-proxy": i18n.T("Configure and restore the GNOME system proxy"), "http-upstream": i18n.T("Force HTTP requests through an upstream host:port"),
+		"tun": i18n.T("Enable TUN mode"), "tun-global": i18n.T("Route all traffic through TUN"), "tun-ip": i18n.T("TUN device CIDR"),
+		"tun-route": i18n.T("Add a static TUN route (repeatable)"), "tun-nat": i18n.T("NAT mapping in SrcCIDR:DstCIDR format"),
+		"verbose": i18n.T("Enable verbose logging"), "log": i18n.T("Log file path"), "rules": i18n.T("Routing rules file"),
 	}
-	for name, id := range usages {
+
+	for name, message := range usages {
 		if flag := rootCmd.PersistentFlags().Lookup(name); flag != nil {
-			flag.Usage = i18n.T(id)
+			flag.Usage = message
 		}
 	}
-	setFlagUsage(rootCmd, "help", i18n.Text("help for ssh-tun", "показать справку по ssh-tun"))
-	setFlagUsage(rootCmd, "version", i18n.Text("version for ssh-tun", "показать версию ssh-tun"))
+	setFlagUsage(rootCmd, "help", i18n.T("help for ssh-tun"))
+	setFlagUsage(rootCmd, "version", i18n.T("version for ssh-tun"))
 	if flag := rootCmd.PersistentFlags().Lookup("write-config"); flag != nil {
-		flag.Usage = i18n.Text("Write a configuration template to a file, or - for stdout", "Записать шаблон конфигурации в файл или вывести в stdout при значении -")
+		flag.Usage = i18n.T("Write a configuration template to a file, or - for stdout")
 	}
 	if flag := rootCmd.PersistentFlags().Lookup("service-force"); flag != nil {
-		flag.Usage = i18n.Text("Overwrite an existing service definition", "Перезаписать существующее определение службы")
+		flag.Usage = i18n.T("Overwrite an existing service definition")
 	}
-	setFlagUsage(rootCmd, "auto-reconnect", i18n.Text("Reconnect automatically when the SSH channel is lost", "Автоматически переподключаться при обрыве SSH-канала"))
-	setFlagUsage(rootCmd, "reconnect-interval", i18n.Text("Delay between SSH reconnect attempts", "Пауза между попытками переподключения SSH"))
-	setFlagUsage(rootCmd, "keepalive-interval", i18n.Text("SSH channel health-check interval", "Интервал проверки состояния SSH-канала"))
+	setFlagUsage(rootCmd, "auto-reconnect", i18n.T("Reconnect automatically when the SSH channel is lost"))
+	setFlagUsage(rootCmd, "reconnect-interval", i18n.T("Delay between SSH reconnect attempts"))
+	setFlagUsage(rootCmd, "keepalive-interval", i18n.T("SSH channel health-check interval"))
 }
 
 func setFlagUsage(cmd *cobra.Command, name, usage string) {
@@ -515,7 +480,7 @@ func parseSSHTarget(target string) (string, string, error) {
 
 	at := strings.LastIndex(target, "@")
 	if at <= 0 || at == len(target)-1 || strings.Contains(target[:at], "@") {
-		return "", "", errors.New(i18n.Text("invalid SSH target; expected user@host", "неверный формат SSH-цели, требуется формат user@host"))
+		return "", "", errors.New(i18n.T("invalid SSH target; expected user@host"))
 	}
 
 	user := target[:at]
@@ -523,7 +488,7 @@ func parseSSHTarget(target string) (string, string, error) {
 
 	// Validate parsed values.
 	if user == "" || host == "" {
-		return "", "", errors.New(i18n.Text("user name and host must not be empty", "имя пользователя или хост не могут быть пустыми"))
+		return "", "", errors.New(i18n.T("user name and host must not be empty"))
 	}
 
 	return user, host, nil
@@ -535,7 +500,7 @@ func addressWithDefaultPort(host, port string) (string, error) {
 	}
 	if parsedHost, parsedPort, err := net.SplitHostPort(host); err == nil {
 		if parsedHost == "" {
-			return "", errors.New(i18n.Text("SSH server host must not be empty", "хост SSH-сервера не может быть пустым"))
+			return "", errors.New(i18n.T("SSH server host must not be empty"))
 		}
 		if err := validatePort(parsedPort); err != nil {
 			return "", err
@@ -546,7 +511,7 @@ func addressWithDefaultPort(host, port string) (string, error) {
 		return net.JoinHostPort(strings.TrimSuffix(strings.TrimPrefix(host, "["), "]"), port), nil
 	}
 	if strings.Contains(host, ":") {
-		return "", fmt.Errorf(i18n.Text("invalid SSH server address: %s", "неверный адрес SSH-сервера: %s"), host)
+		return "", fmt.Errorf(i18n.T("invalid SSH server address: %s"), host)
 	}
 	return net.JoinHostPort(host, port), nil
 }
@@ -554,7 +519,7 @@ func addressWithDefaultPort(host, port string) (string, error) {
 func validatePort(port string) error {
 	value, err := net.LookupPort("tcp", port)
 	if err != nil || value < 1 || value > 65535 {
-		return fmt.Errorf(i18n.Text("invalid SSH port: %s", "неверный порт SSH: %s"), port)
+		return fmt.Errorf(i18n.T("invalid SSH port: %s"), port)
 	}
 	return nil
 }

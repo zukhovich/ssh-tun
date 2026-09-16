@@ -13,3 +13,7 @@ id_ed25519
 .env
 .env.*
 !.env.example
+
+# Generated gettext catalogs embedded by make i18n-sync
+/internal/i18n/locales/*/
+!/internal/i18n/locales/en/

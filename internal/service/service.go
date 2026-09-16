@@ -2,11 +2,14 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 )
 
 type Options struct {
@@ -35,19 +38,19 @@ func Remove(options Options) (string, error) {
 func validate(options *Options) (string, error) {
 	if !isElevated() {
 		if runtime.GOOS == "windows" {
-			return "", fmt.Errorf("service management requires an elevated Administrator console")
+			return "", errors.New(i18n.T("service management requires an elevated Administrator console"))
 		}
-		return "", fmt.Errorf("service management requires root privileges")
+		return "", errors.New(i18n.T("service management requires root privileges"))
 	}
 	if !validServiceName(options.Name) {
-		return "", fmt.Errorf("invalid service name %q", options.Name)
+		return "", fmt.Errorf(i18n.T("invalid service name %q"), options.Name)
 	}
 	if runtime.GOOS != "windows" {
 		if !validAccountName(options.User) {
-			return "", fmt.Errorf("invalid service user %q", options.User)
+			return "", fmt.Errorf(i18n.T("invalid service user %q"), options.User)
 		}
 		if !validAccountName(options.Group) {
-			return "", fmt.Errorf("invalid service group %q", options.Group)
+			return "", fmt.Errorf(i18n.T("invalid service group %q"), options.Group)
 		}
 	}
 	manager, err := Detect(options.Manager)
@@ -62,10 +65,10 @@ func validate(options *Options) (string, error) {
 		*path = absolute
 	}
 	if info, err := os.Stat(options.Binary); err != nil || !info.Mode().IsRegular() || (runtime.GOOS != "windows" && info.Mode()&0111 == 0) {
-		return "", fmt.Errorf("binary %q is not an executable regular file", options.Binary)
+		return "", fmt.Errorf(i18n.T("binary %q is not an executable regular file"), options.Binary)
 	}
 	if info, err := os.Stat(options.Config); err != nil || !info.Mode().IsRegular() {
-		return "", fmt.Errorf("configuration %q is not a regular file", options.Config)
+		return "", fmt.Errorf(i18n.T("configuration %q is not a regular file"), options.Config)
 	}
 	return manager, nil
 }

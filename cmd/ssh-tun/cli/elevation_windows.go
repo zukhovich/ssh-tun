@@ -6,10 +6,12 @@ import (
 	"errors"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 )
 
 func isElevated() bool { return windows.Token(0).IsElevated() }
 
-func relaunchElevated() error {
-	return errors.New("TUN mode requires an elevated Administrator console; sudo is not used on Windows")
+func elevationError() error {
+	return errors.New(i18n.T("TUN mode requires an elevated Administrator console"))
 }

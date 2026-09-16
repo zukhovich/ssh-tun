@@ -76,3 +76,15 @@ func TestValidatePortAndTUNRoutes(t *testing.T) {
 		t.Fatal("an invalid TUN route must be rejected")
 	}
 }
+
+func TestValidateAllowsNonInteractiveAgentAuthentication(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SSHServer = "example.com:22"
+	cfg.SSHUser = "user"
+	cfg.InteractiveAuth = false
+	cfg.SSHPassword = ""
+	cfg.SSHKeyFile = ""
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("agent/default-key authentication must be allowed without explicit credentials: %v", err)
+	}
+}

@@ -10,7 +10,7 @@ import (
 func TestLoadFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ssh-tun.yaml")
 	content := `version: 1
-language: ru
+language: ru # deprecated compatibility field; must be ignored
 ssh:
   target: alice@example.com
   timeout: 15s
@@ -31,12 +31,12 @@ service:
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, language, aliases, err := LoadFile(path)
+	cfg, aliases, err := LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if language != "ru" || cfg.SSHServer != "alice@example.com" || cfg.Timeout != 15*time.Second || cfg.ListenAddr != ":9090" {
-		t.Fatalf("unexpected loaded configuration: %+v, %q", cfg, language)
+	if cfg.SSHServer != "alice@example.com" || cfg.Timeout != 15*time.Second || cfg.ListenAddr != ":9090" {
+		t.Fatalf("unexpected loaded configuration: %+v", cfg)
 	}
 	if len(aliases) != 1 || cfg.ServiceManager != "openrc" || cfg.ServiceName != "tunnel" || !cfg.ServiceEnable || !cfg.ServiceStart {
 		t.Fatalf("unexpected aliases/service configuration: %v, %+v", aliases, cfg)
@@ -48,7 +48,7 @@ func TestLoadFileRejectsUnknownFields(t *testing.T) {
 	if err := os.WriteFile(path, []byte("version: 1\nunknown: true\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := LoadFile(path); err == nil {
+	if _, _, err := LoadFile(path); err == nil {
 		t.Fatal("expected an unknown-field error")
 	}
 }
@@ -58,7 +58,7 @@ func TestLoadFileKeepsServiceDefaultsWhenOmitted(t *testing.T) {
 	if err := os.WriteFile(path, []byte("version: 1\nssh:\n  target: user@example.com\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _, _, err := LoadFile(path)
+	cfg, _, err := LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func TestLoadFileRejectsMultipleDocuments(t *testing.T) {
 	if err := os.WriteFile(path, []byte("version: 1\n---\nversion: 1\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, _, err := LoadFile(path); err == nil {
+	if _, _, err := LoadFile(path); err == nil {
 		t.Fatal("expected a multiple-document error")
 	}
 }
@@ -83,7 +83,7 @@ func TestLoadFileReconnectSettings(t *testing.T) {
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
-	cfg, _, _, err := LoadFile(path)
+	cfg, _, err := LoadFile(path)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,7 @@ import (
 	"github.com/zukhovich/ssh-tun/internal/router"
 )
 
-var errRejected = errors.New("соединение отклонено правилами маршрутизации")
+var errRejected = errors.New(i18n.T("connection rejected by routing rules"))
 
 type SOCKS5OverSSH struct {
 	cfg       *config.Config
@@ -64,21 +64,21 @@ func (s *SOCKS5OverSSH) Start() error {
 	listener, err := net.Listen("tcp", s.cfg.SocksAddr)
 	if err != nil {
 		s.mu.Unlock()
-		err = fmt.Errorf(i18n.Text("failed to start the SOCKS5 proxy: %w", "не удалось запустить SOCKS5-прокси: %w"), err)
+		err = fmt.Errorf(i18n.T("failed to start the SOCKS5 proxy: %w"), err)
 		s.signalStarted(err)
 		return err
 	}
 	s.listener = listener
 	s.mu.Unlock()
 	s.signalStarted(nil)
-	s.logger.Infof(i18n.Text("SOCKS5 proxy is listening on %s", "SOCKS5-прокси запущен на %s"), listener.Addr())
+	s.logger.Infof(i18n.T("SOCKS5 proxy is listening on %s"), listener.Addr())
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
 				return nil
 			}
-			return fmt.Errorf(i18n.Text("failed to accept a SOCKS5 connection: %w", "ошибка приёма SOCKS5-соединения: %w"), err)
+			return fmt.Errorf(i18n.T("failed to accept a SOCKS5 connection: %w"), err)
 		}
 		s.mu.Lock()
 		if s.closed {
@@ -146,7 +146,7 @@ func (s *SOCKS5OverSSH) handleConnection(conn net.Conn) {
 		return
 	}
 	_ = conn.SetDeadline(time.Time{})
-	s.logger.Infof(i18n.Text("[SOCKS5] Connected to %s (rule: %s)", "[SOCKS5] Установлено соединение с %s (правило: %s)"), target, action)
+	s.logger.Infof(i18n.T("[SOCKS5] Connected to %s (rule: %s)"), target, action)
 	relay(conn, conn, dest, dest, s.logger)
 }
 
@@ -156,7 +156,7 @@ func (s *SOCKS5OverSSH) handshake(conn net.Conn) error {
 		return err
 	}
 	if header[0] != 0x05 {
-		return fmt.Errorf("неподдерживаемая версия SOCKS: %d", header[0])
+		return fmt.Errorf(i18n.T("unsupported SOCKS version: %d"), header[0])
 	}
 	methods := make([]byte, int(header[1]))
 	if _, err := io.ReadFull(conn, methods); err != nil {
@@ -169,7 +169,7 @@ func (s *SOCKS5OverSSH) handshake(conn net.Conn) error {
 		}
 	}
 	_, _ = conn.Write([]byte{0x05, 0xff})
-	return errors.New("клиент не предложил аутентификацию без пароля")
+	return errors.New(i18n.T("client did not offer no-authentication method"))
 }
 
 func (s *SOCKS5OverSSH) readRequest(conn net.Conn) (string, string, error) {
@@ -178,11 +178,11 @@ func (s *SOCKS5OverSSH) readRequest(conn net.Conn) (string, string, error) {
 		return "", "", err
 	}
 	if header[0] != 0x05 || header[2] != 0x00 {
-		return "", "", errors.New("неверный заголовок SOCKS5-запроса")
+		return "", "", errors.New(i18n.T("invalid SOCKS5 request header"))
 	}
 	if header[1] != 0x01 {
 		_ = s.reply(conn, 0x07)
-		return "", "", fmt.Errorf("неподдерживаемая команда: %d", header[1])
+		return "", "", fmt.Errorf(i18n.T("unsupported command: %d"), header[1])
 	}
 	var host string
 	switch header[3] {
@@ -198,7 +198,7 @@ func (s *SOCKS5OverSSH) readRequest(conn net.Conn) (string, string, error) {
 			return "", "", err
 		}
 		if length[0] == 0 {
-			return "", "", errors.New("пустое доменное имя")
+			return "", "", errors.New(i18n.T("empty domain name"))
 		}
 		value := make([]byte, int(length[0]))
 		if _, err := io.ReadFull(conn, value); err != nil {
@@ -213,7 +213,7 @@ func (s *SOCKS5OverSSH) readRequest(conn net.Conn) (string, string, error) {
 		host = net.IP(value).String()
 	default:
 		_ = s.reply(conn, 0x08)
-		return "", "", fmt.Errorf("неподдерживаемый тип адреса: %d", header[3])
+		return "", "", fmt.Errorf(i18n.T("unsupported address type: %d"), header[3])
 	}
 	portBytes := make([]byte, 2)
 	if _, err := io.ReadFull(conn, portBytes); err != nil {
@@ -236,7 +236,7 @@ func (s *SOCKS5OverSSH) dialTarget(ctx context.Context, addr, host string) (net.
 		return conn, action, err
 	default:
 		if s.ssh == nil {
-			return nil, action, errors.New(i18n.Text("SSH client is not ready", "SSH-клиент не готов"))
+			return nil, action, errors.New(i18n.T("SSH client is not ready"))
 		}
 		conn, err := s.ssh.DialContext(ctx, "tcp", addr)
 		return conn, action, err

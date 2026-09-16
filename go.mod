@@ -3,6 +3,7 @@ module github.com/zukhovich/ssh-tun
 go 1.25.5
 
 require (
+	github.com/leonelquinteros/gotext v1.7.2
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/crypto v0.42.0

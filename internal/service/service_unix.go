@@ -3,12 +3,15 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 )
 
 var (
@@ -23,7 +26,7 @@ func validAccountName(name string) bool { return validAccount.MatchString(name) 
 func detectManager(requested string) (string, error) {
 	if requested != "" && requested != "auto" {
 		if requested != "systemd" && requested != "openrc" {
-			return "", fmt.Errorf("unsupported service manager %q", requested)
+			return "", fmt.Errorf(i18n.T("unsupported service manager %q"), requested)
 		}
 		return requested, nil
 	}
@@ -35,20 +38,20 @@ func detectManager(requested string) (string, error) {
 	if _, err := exec.LookPath("rc-service"); err == nil {
 		return "openrc", nil
 	}
-	return "", fmt.Errorf("systemd or OpenRC was not detected")
+	return "", errors.New(i18n.T("systemd or OpenRC was not detected"))
 }
 
 func installPlatform(manager string, options Options) (string, error) {
 	content, path := render(manager, options)
 	if _, err := os.Stat(path); err == nil && !options.Force {
-		return "", fmt.Errorf("service file %s already exists; use --service-force", path)
+		return "", fmt.Errorf(i18n.T("service file %s already exists; use --service-force"), path)
 	}
 	mode := os.FileMode(0644)
 	if manager == "openrc" {
 		mode = 0755
 	}
 	if err := os.WriteFile(path, []byte(content), mode); err != nil {
-		return "", fmt.Errorf("write service file: %w", err)
+		return "", fmt.Errorf(i18n.T("write service file: %w"), err)
 	}
 	if manager == "systemd" {
 		if err := run("systemctl", "daemon-reload"); err != nil {
@@ -123,7 +126,7 @@ func systemdEscape(value string) string {
 func run(name string, args ...string) error {
 	output, err := exec.Command(name, args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%s %s: %s: %w", name, strings.Join(args, " "), strings.TrimSpace(string(output)), err)
+		return fmt.Errorf(i18n.T("%s %s: %s: %w"), name, strings.Join(args, " "), strings.TrimSpace(string(output)), err)
 	}
 	return nil
 }

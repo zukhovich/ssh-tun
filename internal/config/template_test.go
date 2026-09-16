@@ -38,7 +38,7 @@ func TestTemplateLoadsForEveryPlatform(t *testing.T) {
 		if err := os.WriteFile(path, []byte(Template(goos)), 0600); err != nil {
 			t.Fatal(err)
 		}
-		cfg, _, _, err := LoadFile(path)
+		cfg, _, err := LoadFile(path)
 		if err != nil {
 			t.Fatalf("LoadFile(%s) failed: %v", goos, err)
 		}
