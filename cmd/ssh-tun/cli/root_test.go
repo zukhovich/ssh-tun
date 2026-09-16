@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"os"
 	"testing"
-
-	"github.com/zukhovich/ssh-tun/internal/i18n"
 )
 
 func TestParseSSHTarget(t *testing.T) {
@@ -17,24 +14,9 @@ func TestParseSSHTarget(t *testing.T) {
 	}
 }
 
-func TestBootstrapLanguageDefaultsToEnglish(t *testing.T) {
-	originalArgs, originalLanguage := os.Args, language
-	t.Cleanup(func() {
-		os.Args, language = originalArgs, originalLanguage
-		_ = i18n.Set("en")
-	})
-
-	language = "en"
-	os.Args = []string{"ssh-tun"}
-	bootstrapLanguage()
-	if got := i18n.Language(); got != "en" {
-		t.Fatalf("Language() = %q, want en", got)
-	}
-
-	os.Args = []string{"ssh-tun", "--lang", "ru"}
-	bootstrapLanguage()
-	if got := i18n.Language(); got != "ru" {
-		t.Fatalf("Language() = %q, want ru", got)
+func TestLanguageFlagRemoved(t *testing.T) {
+	if flag := rootCmd.PersistentFlags().Lookup("lang"); flag != nil {
+		t.Fatal("--lang must not exist; gettext locale environment controls translations")
 	}
 }
 

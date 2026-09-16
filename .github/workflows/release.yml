@@ -29,20 +29,22 @@ jobs:
         run: |
           source_version=$(awk '/^VERSION := / { print $3 }' Makefile)
           test "${GITHUB_REF_NAME}" = "v${source_version}"
+      - name: Install UPX
+        shell: bash
+        run: |
+          upx_version=5.2.1
+          archive="upx-${upx_version}-amd64_linux.tar.xz"
+          curl -fsSLO "https://github.com/upx/upx/releases/download/v${upx_version}/${archive}"
+          echo "402162aad30af47e60dbd767fb2e64ca394ace9727ba1f40283641f1d1b91657  ${archive}" | sha256sum -c -
+          tar -xJf "${archive}"
+          sudo install -m 0755 "upx-${upx_version}-amd64_linux/upx" /usr/local/bin/upx
+          upx --version
       - name: Build release archives
         run: make package-release
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          body: |
-            ## ssh-tun 1.0.3
-
-            - Added OS-aware configuration templates and native systemd, OpenRC, and Windows service management.
-            - Added monitored SSH keepalives and automatic reconnection without restarting local proxy listeners.
-            - Fixed Windows elevation handling so Windows never attempts to invoke sudo.
-            - Tightened configuration, routing, startup, and service validation.
-            - Added Linux and Windows amd64/arm64 release binaries and regression tests.
           files: |
             build/ssh-tun_*_linux_amd64.tar.gz
             build/ssh-tun_*_linux_arm64.tar.gz

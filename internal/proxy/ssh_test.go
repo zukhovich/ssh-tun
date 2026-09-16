@@ -129,9 +129,7 @@ func TestChangedHostKeyIsRejectedWithoutPrompt(t *testing.T) {
 }
 
 func TestConnectToHostWithConfiguredKey(t *testing.T) {
-	if err := i18n.Set("en"); err != nil {
-		t.Fatal(err)
-	}
+	i18n.Init("en")
 
 	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

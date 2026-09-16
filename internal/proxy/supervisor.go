@@ -70,7 +70,7 @@ func (s *Supervisor) monitor() {
 		if !waitDisconnected(client, s.cfg.KeepAliveInterval, s.stop) {
 			return
 		}
-		s.log.Warnf(i18n.Text("SSH connection lost; reconnecting every %s...", "SSH-соединение потеряно; переподключение каждые %s..."), s.cfg.ReconnectInterval)
+		s.log.Warnf(i18n.T("SSH connection lost; reconnecting every %s..."), s.cfg.ReconnectInterval)
 		for {
 			select {
 			case <-s.stop:
@@ -79,14 +79,14 @@ func (s *Supervisor) monitor() {
 			}
 			replacement, err := NewSSHClient(s.cfg, s.log)
 			if err != nil {
-				s.log.Warnf(i18n.Text("SSH reconnect failed: %v", "Не удалось переподключиться по SSH: %v"), err)
+				s.log.Warnf(i18n.T("SSH reconnect failed: %v"), err)
 				continue
 			}
 			if err := client.replaceFrom(replacement); err != nil {
-				s.log.Warnf(i18n.Text("SSH reconnect failed: %v", "Не удалось переподключиться по SSH: %v"), err)
+				s.log.Warnf(i18n.T("SSH reconnect failed: %v"), err)
 				continue
 			}
-			s.log.Info(i18n.Text("SSH connection restored", "SSH-соединение восстановлено"))
+			s.log.Info(i18n.T("SSH connection restored"))
 			break
 		}
 	}
@@ -119,7 +119,7 @@ func minDuration(a, b time.Duration) time.Duration {
 func (s *Supervisor) dialContext(ctx context.Context, network, addr string) (net.Conn, error) {
 	client := s.SSH()
 	if client == nil {
-		return nil, errors.New(i18n.Text("SSH client is not ready", "SSH-клиент не готов"))
+		return nil, errors.New(i18n.T("SSH client is not ready"))
 	}
 	return client.DialContext(ctx, network, addr)
 }

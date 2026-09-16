@@ -2,8 +2,6 @@
 # Copy to ~/.config/ssh-tun/config.yaml for a user process, or to
 # /etc/ssh-tun/config.yaml for a systemd/OpenRC service (chmod 600).
 version: 1
-language: en
-
 ssh:
   target: user@example.com
   port: "22"

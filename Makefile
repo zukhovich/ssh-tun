@@ -11,33 +11,42 @@ GOCLEAN := $(GOCMD) clean
 GOTEST := $(GOCMD) test
 GOMOD := $(GOCMD) mod
 GOVET := $(GOCMD) vet
+UPX_BIN ?= upx
 
-.PHONY: all build clean test vet tidy run help build-release package-release
+.PHONY: all build clean test vet tidy run help i18n-sync build-release compress-release package-release
 
 all: test build
 
-build:
+i18n-sync:
+	@for f in po/*.po; do \
+		[ -e "$$f" ] || continue; \
+		lang=$$(basename "$$f" .po); \
+		mkdir -p "internal/i18n/locales/$$lang/LC_MESSAGES"; \
+		cp "$$f" "internal/i18n/locales/$$lang/LC_MESSAGES/ssh-tun.po"; \
+	done
+
+build: i18n-sync
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 GOOS=linux $(GOBUILD) $(LINUX_LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(MAIN_PACKAGE)
 	@echo "Build complete: $(BUILD_DIR)/$(BINARY_NAME)"
 
-build-linux-amd64:
+build-linux-amd64: i18n-sync
 	@echo "Building for Linux amd64..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GOBUILD) $(LINUX_LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_amd64 $(MAIN_PACKAGE)
 
-build-linux-arm64:
+build-linux-arm64: i18n-sync
 	@echo "Building for Linux arm64..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GOBUILD) $(LINUX_LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_arm64 $(MAIN_PACKAGE)
 
-build-windows-amd64:
+build-windows-amd64: i18n-sync
 	@echo "Building for Windows amd64..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_amd64.exe $(MAIN_PACKAGE)
 
-build-windows-arm64:
+build-windows-arm64: i18n-sync
 	@echo "Building for Windows arm64..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GOBUILD) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_arm64.exe $(MAIN_PACKAGE)
@@ -46,7 +55,15 @@ build-release: build-linux-amd64 build-linux-arm64 build-windows-amd64 build-win
 	@echo "Release build complete: $(VERSION)"
 	@ls -la $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_*
 
-package-release: build-release
+compress-release: build-release
+	@command -v $(UPX_BIN) >/dev/null 2>&1 || { echo "UPX is required for release builds" >&2; exit 1; }
+	@echo "Compressing release binaries with UPX..."
+	@for file in $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_amd64 $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_arm64 $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_amd64.exe $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_arm64.exe; do \
+		$(UPX_BIN) "$$file"; \
+	done
+	@$(UPX_BIN) -t $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_amd64 $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_linux_arm64 $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_amd64.exe $(BUILD_DIR)/$(BINARY_NAME)_$(VERSION)_windows_arm64.exe
+
+package-release: compress-release
 	@echo "Packaging release files..."
 	@cd $(BUILD_DIR) && \
 	for file in $(BINARY_NAME)_$(VERSION)_linux_amd64 $(BINARY_NAME)_$(VERSION)_linux_arm64 $(BINARY_NAME)_$(VERSION)_windows_amd64.exe $(BINARY_NAME)_$(VERSION)_windows_arm64.exe; do \
@@ -84,12 +101,14 @@ version:
 
 help:
 	@echo "Make targets:"
+	@echo "  i18n-sync         - Copy po/*.po into embedded locale directories"
 	@echo "  build             - Build a static ssh-tun binary for Linux"
 	@echo "  build-linux-amd64 - Build for Linux amd64"
 	@echo "  build-linux-arm64   - Build for Linux arm64"
 	@echo "  build-windows-amd64 - Build for Windows amd64"
 	@echo "  build-windows-arm64 - Build for Windows arm64"
 	@echo "  build-release       - Build all release binaries"
+	@echo "  compress-release    - Compress release binaries with UPX"
 	@echo "  package-release   - Build and package release archives"
 	@echo "  clean             - Remove build artifacts"
 	@echo "  test              - Run tests"

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 	"golang.org/x/sys/windows"
 )
 
@@ -24,13 +25,13 @@ func detectManager(requested string) (string, error) {
 	if requested == "" || requested == "auto" || requested == "windows" {
 		return "windows", nil
 	}
-	return "", fmt.Errorf("unsupported Windows service manager %q", requested)
+	return "", fmt.Errorf(i18n.T("unsupported Windows service manager %q"), requested)
 }
 
 func installPlatform(manager string, o Options) (string, error) {
 	if _, err := queryService(o.Name); err == nil {
 		if !o.Force {
-			return "", fmt.Errorf("service %q already exists; use --service-force", o.Name)
+			return "", fmt.Errorf(i18n.T("service %q already exists; use --service-force"), o.Name)
 		}
 		_, _ = run("sc.exe", "stop", o.Name)
 		if _, err := run("sc.exe", "delete", o.Name); err != nil {
@@ -75,7 +76,7 @@ func queryService(name string) (string, error) {
 func run(name string, args ...string) (string, error) {
 	output, err := exec.Command(name, args...).CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("%s %s: %s: %w", name, strings.Join(args, " "), strings.TrimSpace(string(output)), err)
+		return "", fmt.Errorf(i18n.T("%s %s: %s: %w"), name, strings.Join(args, " "), strings.TrimSpace(string(output)), err)
 	}
 	return string(output), nil
 }

@@ -1,0 +1,1140 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the ssh-tun package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-09-16 14:36+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: cmd/ssh-tun/cli/elevation_unix.go:15
+msgid "TUN mode requires root privileges; rerun ssh-tun as root"
+msgstr ""
+
+#: cmd/ssh-tun/cli/elevation_windows.go:16
+msgid "TUN mode requires an elevated Administrator console"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:100
+msgid ""
+"%s service %q removed\n"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:118
+msgid "SSH target is required (user@host)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:164
+msgid "configuration error: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:171
+msgid "failed to configure the log file: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:173
+msgid "Logs will also be written to: %s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:175
+msgid "ssh-tun %s is starting..."
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:183
+msgid "failed to load the routing rules file: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:185
+msgid "Loaded routing rules file: %s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:191
+msgid "SSH connection error: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:199
+msgid "failed to initialize the HTTP proxy: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:207
+msgid "failed to initialize the SOCKS5 proxy: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:221
+msgid "failed to initialize the TUN service: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:228
+msgid "failed to start the TUN service: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:268
+msgid "System proxy integration is unavailable; continuing without it: %v"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:275
+msgid "Proxy service started"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:276
+msgid "HTTP proxy:"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:278
+msgid "SOCKS5 proxy:"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:281
+msgid ""
+"TUN mode enabled (CIDR: %s)\n"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:285
+msgid ""
+"SSH jump-host chain: %v -> %s\n"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:287
+msgid "Direct connection to SSH server:"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:290
+msgid "System proxy enabled"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:293
+msgid "Custom routing rules enabled:"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:296
+msgid "Auto-reconnect enabled"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:298
+msgid "Press Ctrl+C to exit"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:301
+msgid "Shutdown signal received; closing proxy services..."
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:305
+msgid "Failed to restore system proxy settings: %v"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:310
+msgid "Failed to close the HTTP proxy: %v"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:315
+msgid "Failed to close the SOCKS5 proxy: %v"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:321
+msgid "Failed to close the TUN service: %v"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:331
+#: cmd/ssh-tun/cli/root.go:434
+msgid "Path to the YAML configuration file"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:332
+#: cmd/ssh-tun/cli/root.go:456
+msgid "Write a configuration template to a file, or - for stdout"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:333
+#: cmd/ssh-tun/cli/root.go:435
+msgid "Install a service using auto, systemd, or openrc"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:334
+#: cmd/ssh-tun/cli/root.go:435
+msgid "Remove a service using auto, systemd, or openrc"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:335
+#: cmd/ssh-tun/cli/root.go:436
+msgid "Service name"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:336
+#: cmd/ssh-tun/cli/root.go:436
+msgid "Service user"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:337
+#: cmd/ssh-tun/cli/root.go:436
+msgid "Service group"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:338
+#: cmd/ssh-tun/cli/root.go:459
+msgid "Overwrite an existing service definition"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:340
+#: cmd/ssh-tun/cli/root.go:437
+msgid "SSH server port"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:341
+#: cmd/ssh-tun/cli/root.go:437
+msgid "SSH password (unsafe; interactive authentication is recommended)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:342
+#: cmd/ssh-tun/cli/root.go:438
+msgid "Private key file"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:343
+msgid "Deprecated: use --identity-file"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:345
+#: cmd/ssh-tun/cli/root.go:438
+msgid "known_hosts file (default: ~/.ssh/known_hosts)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:346
+#: cmd/ssh-tun/cli/root.go:439
+msgid "Disable SSH host key verification (unsafe)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:347
+#: cmd/ssh-tun/cli/root.go:439
+msgid "Comma-separated SSH jump hosts (user@host:port)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:348
+#: cmd/ssh-tun/cli/root.go:440
+msgid "Connection timeout"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:349
+#: cmd/ssh-tun/cli/root.go:461
+msgid "Reconnect automatically when the SSH channel is lost"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:350
+#: cmd/ssh-tun/cli/root.go:462
+msgid "Delay between SSH reconnect attempts"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:351
+#: cmd/ssh-tun/cli/root.go:463
+msgid "SSH channel health-check interval"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:354
+#: cmd/ssh-tun/cli/root.go:440
+msgid "Local HTTP proxy address (deprecated; use --http)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:355
+#: cmd/ssh-tun/cli/root.go:441
+msgid "Local HTTP proxy address"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:356
+#: cmd/ssh-tun/cli/root.go:441
+msgid "SOCKS5 proxy address (for example :1080)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:357
+#: cmd/ssh-tun/cli/root.go:442
+msgid "Configure and restore the GNOME system proxy"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:358
+#: cmd/ssh-tun/cli/root.go:442
+msgid "Force HTTP requests through an upstream host:port"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:360
+msgid "Deprecated: use --http-upstream"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:364
+#: cmd/ssh-tun/cli/root.go:443
+msgid "Enable TUN mode"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:365
+#: cmd/ssh-tun/cli/root.go:443
+msgid "Route all traffic through TUN"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:366
+#: cmd/ssh-tun/cli/root.go:443
+msgid "TUN device CIDR"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:367
+#: cmd/ssh-tun/cli/root.go:444
+msgid "Add a static TUN route (repeatable)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:368
+#: cmd/ssh-tun/cli/root.go:444
+msgid "NAT mapping in SrcCIDR:DstCIDR format"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:371
+#: cmd/ssh-tun/cli/root.go:445
+msgid "Enable verbose logging"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:372
+#: cmd/ssh-tun/cli/root.go:445
+msgid "Log file path"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:373
+#: cmd/ssh-tun/cli/root.go:445
+msgid "Routing rules file"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:424
+msgid "Usage"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:424
+msgid "Flags"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:431
+msgid ""
+"Usage:\n"
+"  %s\n"
+"\n"
+"Flags:\n"
+"%s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:45
+#: cmd/ssh-tun/cli/root.go:422
+msgid "Lightweight SSH-based HTTP proxy"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:453
+msgid "help for ssh-tun"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:454
+msgid "version for ssh-tun"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:46
+#: cmd/ssh-tun/cli/root.go:422
+msgid ""
+"ssh-tun is a command-line HTTP, SOCKS5, and TUN proxy over SSH.\n"
+"It provides secure access to private networks or uses a remote host as an Internet gateway."
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:483
+msgid "invalid SSH target; expected user@host"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:491
+msgid "user name and host must not be empty"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:503
+msgid "SSH server host must not be empty"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:514
+msgid "invalid SSH server address: %s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:522
+msgid "invalid SSH port: %s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:56
+msgid "create configuration directory: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:59
+msgid "write configuration template: %w"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:65
+msgid "--config is required for service management"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go:95
+msgid ""
+"%s service %q installed\n"
+msgstr ""
+
+#: internal/config/config.go:105
+msgid "invalid IPv6 address: %s"
+msgstr ""
+
+#: internal/config/config.go:110
+msgid "IPv6 addresses must be enclosed in brackets: %s"
+msgstr ""
+
+#: internal/config/config.go:116
+msgid "invalid host:port value %s: %w"
+msgstr ""
+
+#: internal/config/config.go:120
+msgid "host and port must not be empty"
+msgstr ""
+
+#: internal/config/config.go:132
+msgid "SSH server address is required"
+msgstr ""
+
+#: internal/config/config.go:136
+msgid "SSH user name is required"
+msgstr ""
+
+#: internal/config/config.go:142
+msgid "timeout must be greater than zero"
+msgstr ""
+
+#: internal/config/config.go:145
+msgid "reconnect interval must be greater than zero"
+msgstr ""
+
+#: internal/config/config.go:148
+msgid "keepalive interval must be greater than zero"
+msgstr ""
+
+#: internal/config/config.go:151
+msgid "invalid HTTP proxy address: %w"
+msgstr ""
+
+#: internal/config/config.go:155
+msgid "invalid SOCKS5 proxy address: %w"
+msgstr ""
+
+#: internal/config/config.go:160
+msgid "invalid upstream HTTP server address: %w"
+msgstr ""
+
+#: internal/config/config.go:166
+msgid "invalid IPv4 TUN CIDR: %s"
+msgstr ""
+
+#: internal/config/config.go:171
+msgid "invalid IPv4 TUN route: %s"
+msgstr ""
+
+#: internal/config/config.go:176
+msgid "invalid service manager: %s"
+msgstr ""
+
+#: internal/config/config.go:185
+msgid "invalid SSH jump host: %w"
+msgstr ""
+
+#: internal/config/config.go:195
+msgid "invalid TCP port: %s"
+msgstr ""
+
+#: internal/config/config.go:204
+msgid "invalid NAT rule %q; expected Src:Dst"
+msgstr ""
+
+#: internal/config/config.go:210
+msgid "IPv6 is not supported: %s"
+msgstr ""
+
+#: internal/config/config.go:216
+msgid "invalid IPv4 address or CIDR: %s"
+msgstr ""
+
+#: internal/config/config.go:231
+msgid "source and destination prefix lengths differ: %d and %d"
+msgstr ""
+
+#: internal/config/config.go:95
+msgid "invalid SSH jump-host format: %s"
+msgstr ""
+
+#: internal/config/file.go:104
+msgid "invalid ssh.reconnect_interval: %w"
+msgstr ""
+
+#: internal/config/file.go:110
+msgid "invalid ssh.keepalive_interval: %w"
+msgstr ""
+
+#: internal/config/file.go:64
+msgid "open configuration: %w"
+msgstr ""
+
+#: internal/config/file.go:71
+#: internal/config/file.go:77
+msgid "decode configuration: %w"
+msgstr ""
+
+#: internal/config/file.go:75
+msgid "decode configuration: multiple YAML documents are not allowed"
+msgstr ""
+
+#: internal/config/file.go:80
+msgid "unsupported configuration version %d"
+msgstr ""
+
+#: internal/config/file.go:95
+msgid "invalid ssh.timeout: %w"
+msgstr ""
+
+#: internal/logger/logger.go:53
+msgid "failed to create the log directory: %w"
+msgstr ""
+
+#: internal/logger/logger.go:58
+msgid "failed to open the log file: %w"
+msgstr ""
+
+#: internal/proxy/http.go:123
+msgid "Absolute URL is required"
+msgstr ""
+
+#: internal/proxy/http.go:128
+msgid "Request rejected by a routing rule: %s"
+msgstr ""
+
+#: internal/proxy/http.go:129
+msgid "Request rejected by routing rules"
+msgstr ""
+
+#: internal/proxy/http.go:145
+#: internal/proxy/http.go:216
+#: internal/proxy/socks5.go:239
+#: internal/proxy/ssh.go:522
+#: internal/proxy/supervisor.go:122
+msgid "SSH client is not ready"
+msgstr ""
+
+#: internal/proxy/http.go:150
+msgid "Failed to connect to target through SSH"
+msgstr ""
+
+#: internal/proxy/http.go:159
+msgid "Failed to send request"
+msgstr ""
+
+#: internal/proxy/http.go:164
+msgid "Failed to read response"
+msgstr ""
+
+#: internal/proxy/http.go:178
+msgid "Failed to perform direct request"
+msgstr ""
+
+#: internal/proxy/http.go:199
+msgid "Connection rejected by routing rules"
+msgstr ""
+
+#: internal/proxy/http.go:204
+msgid "Connection hijacking is not supported"
+msgstr ""
+
+#: internal/proxy/http.go:222
+msgid "Failed to connect to target"
+msgstr ""
+
+#: internal/proxy/http.go:253
+msgid "Data transfer error: %v"
+msgstr ""
+
+#: internal/proxy/http.go:91
+msgid "failed to start the HTTP proxy: %w"
+msgstr ""
+
+#: internal/proxy/http.go:98
+msgid "HTTP/HTTPS proxy is listening on %s"
+msgstr ""
+
+#: internal/proxy/socks5.go:149
+msgid "[SOCKS5] Connected to %s (rule: %s)"
+msgstr ""
+
+#: internal/proxy/socks5.go:159
+msgid "unsupported SOCKS version: %d"
+msgstr ""
+
+#: internal/proxy/socks5.go:172
+msgid "client did not offer no-authentication method"
+msgstr ""
+
+#: internal/proxy/socks5.go:181
+msgid "invalid SOCKS5 request header"
+msgstr ""
+
+#: internal/proxy/socks5.go:185
+msgid "unsupported command: %d"
+msgstr ""
+
+#: internal/proxy/socks5.go:20
+msgid "connection rejected by routing rules"
+msgstr ""
+
+#: internal/proxy/socks5.go:201
+msgid "empty domain name"
+msgstr ""
+
+#: internal/proxy/socks5.go:216
+msgid "unsupported address type: %d"
+msgstr ""
+
+#: internal/proxy/socks5.go:67
+msgid "failed to start the SOCKS5 proxy: %w"
+msgstr ""
+
+#: internal/proxy/socks5.go:74
+msgid "SOCKS5 proxy is listening on %s"
+msgstr ""
+
+#: internal/proxy/socks5.go:81
+msgid "failed to accept a SOCKS5 connection: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:100
+msgid "Added default SSH key: %s"
+msgstr ""
+
+#: internal/proxy/ssh.go:111
+msgid "failed to get the SSH password: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:119
+msgid "no password was configured and interactive authentication is unavailable"
+msgstr ""
+
+#: internal/proxy/ssh.go:121
+msgid "no SSH private keys were found"
+msgstr ""
+
+#: internal/proxy/ssh.go:136
+msgid "Failed to parse SSH jump-host parameters: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:144
+msgid "Connecting to SSH jump host %d/%d: %s"
+msgstr ""
+
+#: internal/proxy/ssh.go:153
+msgid "Failed to connect to SSH jump host %s: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:158
+msgid "Connected to SSH jump host %d: %s@%s"
+msgstr ""
+
+#: internal/proxy/ssh.go:162
+msgid "Preparing to connect to the target SSH server: %s"
+msgstr ""
+
+#: internal/proxy/ssh.go:170
+msgid "Failed to connect to the target SSH server %s: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:176
+msgid "Connected to the target SSH server: %s"
+msgstr ""
+
+#: internal/proxy/ssh.go:207
+msgid "SSH key authentication is unavailable: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:240
+msgid "no SSH authentication methods are available"
+msgstr ""
+
+#: internal/proxy/ssh.go:259
+msgid "failed to load known_hosts %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:271
+msgid "SSH host key is unknown; add it to %s or use --insecure-host-key: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:278
+msgid "SSH host key was not accepted"
+msgstr ""
+
+#: internal/proxy/ssh.go:292
+msgid "failed to determine the home directory for known_hosts: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:299
+msgid "failed to expand the known_hosts path: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:308
+msgid "failed to create the known_hosts directory: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:312
+msgid "failed to create known_hosts %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:323
+msgid ""
+"The authenticity of host '%s' (%s) cannot be established.\n"
+"%s key fingerprint is SHA256:%s.\n"
+"Continue connecting (yes/no)? "
+msgstr ""
+
+#: internal/proxy/ssh.go:328
+msgid "failed to read host-key confirmation: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:339
+msgid "failed to open known_hosts %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:345
+msgid "failed to save the SSH host key: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:370
+msgid "failed to connect to %s through an SSH jump host: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:375
+msgid "failed to establish an SSH connection to %s through a jump host: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:413
+msgid "replacement SSH client is not ready"
+msgstr ""
+
+#: internal/proxy/ssh.go:419
+msgid "SSH client is closed"
+msgstr ""
+
+#: internal/proxy/ssh.go:451
+msgid "Closing the target SSH connection"
+msgstr ""
+
+#: internal/proxy/ssh.go:460
+msgid "Closing SSH jump-host connection %d"
+msgstr ""
+
+#: internal/proxy/ssh.go:476
+msgid "failed to expand the ~ path: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:483
+msgid "failed to read private key file %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:491
+msgid "failed to parse private key %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:494
+msgid "private key %q is passphrase-protected; load it into ssh-agent or enable interactive authentication"
+msgstr ""
+
+#: internal/proxy/ssh.go:497
+msgid "Enter passphrase for SSH key %s: "
+msgstr ""
+
+#: internal/proxy/ssh.go:505
+msgid "failed to decrypt private key %q: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:58
+msgid "Trying the configured SSH private key: %s"
+msgstr ""
+
+#: internal/proxy/ssh.go:61
+msgid "failed to load the configured SSH private key: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go:70
+msgid "Skipping unavailable SSH agent %s: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:75
+msgid "Failed to list SSH agent keys: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:78
+msgid "Added %d key(s) from the SSH agent"
+msgstr ""
+
+#: internal/proxy/ssh.go:89
+msgid "Cannot determine the home directory for default SSH keys: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go:97
+msgid "Skipping unavailable SSH key %s: %v"
+msgstr ""
+
+#: internal/proxy/supervisor.go:73
+msgid "SSH connection lost; reconnecting every %s..."
+msgstr ""
+
+#: internal/proxy/supervisor.go:82
+#: internal/proxy/supervisor.go:86
+msgid "SSH reconnect failed: %v"
+msgstr ""
+
+#: internal/proxy/supervisor.go:89
+msgid "SSH connection restored"
+msgstr ""
+
+#: internal/router/router.go:103
+msgid "routing rules line %d has an invalid format"
+msgstr ""
+
+#: internal/router/router.go:110
+msgid "routing rules line %d contains an unknown rule type: %s"
+msgstr ""
+
+#: internal/router/router.go:114
+msgid "routing rules line %d must use MATCH,,ACTION"
+msgstr ""
+
+#: internal/router/router.go:117
+msgid "routing rules line %d contains an empty value"
+msgstr ""
+
+#: internal/router/router.go:130
+msgid "routing rules line %d contains an unknown action: %s"
+msgstr ""
+
+#: internal/router/router.go:142
+msgid "routing rules line %d contains an invalid CIDR: %w"
+msgstr ""
+
+#: internal/router/router.go:145
+msgid "routing rules line %d contains a CIDR of the wrong IP version"
+msgstr ""
+
+#: internal/router/router.go:68
+msgid "routing rules path must not be empty"
+msgstr ""
+
+#: internal/router/router.go:73
+msgid "failed to read routing rules file: %w"
+msgstr ""
+
+#: internal/router/router.go:80
+msgid "failed to parse the YAML routing rules file: %w"
+msgstr ""
+
+#: internal/router/router.go:89
+msgid "unknown routing mode: %s"
+msgstr ""
+
+#: internal/service/service.go:41
+msgid "service management requires an elevated Administrator console"
+msgstr ""
+
+#: internal/service/service.go:43
+msgid "service management requires root privileges"
+msgstr ""
+
+#: internal/service/service.go:46
+msgid "invalid service name %q"
+msgstr ""
+
+#: internal/service/service.go:50
+msgid "invalid service user %q"
+msgstr ""
+
+#: internal/service/service.go:53
+msgid "invalid service group %q"
+msgstr ""
+
+#: internal/service/service.go:68
+msgid "binary %q is not an executable regular file"
+msgstr ""
+
+#: internal/service/service.go:71
+msgid "configuration %q is not a regular file"
+msgstr ""
+
+#: internal/service/service_unix.go:129
+#: internal/service/service_windows.go:79
+msgid "%s %s: %s: %w"
+msgstr ""
+
+#: internal/service/service_unix.go:29
+msgid "unsupported service manager %q"
+msgstr ""
+
+#: internal/service/service_unix.go:41
+msgid "systemd or OpenRC was not detected"
+msgstr ""
+
+#: internal/service/service_unix.go:47
+msgid "service file %s already exists; use --service-force"
+msgstr ""
+
+#: internal/service/service_unix.go:54
+msgid "write service file: %w"
+msgstr ""
+
+#: internal/service/service_windows.go:28
+msgid "unsupported Windows service manager %q"
+msgstr ""
+
+#: internal/service/service_windows.go:34
+msgid "service %q already exists; use --service-force"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:111
+msgid "gsettings get %s %s: %s: %w"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:187
+msgid "gsettings %s: %s: %w"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:36
+msgid "Failed to parse address %s: %v; using %s"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:66
+msgid "failed to save system proxy settings: %w"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:72
+msgid "System proxy configured for HTTP %s"
+msgstr ""
+
+#: internal/sysproxy/sysproxy.go:86
+msgid "System proxy settings restored"
+msgstr ""
+
+#: internal/tun/tun.go:100
+msgid "failed to create TUN device: %w"
+msgstr ""
+
+#: internal/tun/tun.go:112
+msgid "[TUN] Device created: %s"
+msgstr ""
+
+#: internal/tun/tun.go:120
+msgid "failed to configure TUN IP address: %w"
+msgstr ""
+
+#: internal/tun/tun.go:132
+msgid "failed to configure global routes: %w"
+msgstr ""
+
+#: internal/tun/tun.go:136
+msgid "failed to configure routes: %w"
+msgstr ""
+
+#: internal/tun/tun.go:142
+msgid "[TUN] Adding subnet alias route: %s -> TUN"
+msgstr ""
+
+#: internal/tun/tun.go:144
+msgid "failed to add NAT route %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:152
+msgid "[TUN] Mode started: IP address %s, peer address %s"
+msgstr ""
+
+#: internal/tun/tun.go:172
+msgid "failed to remove route %v: %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:190
+msgid "failed to create NIC: %v"
+msgstr ""
+
+#: internal/tun/tun.go:203
+msgid "failed to add protocol address: %v"
+msgstr ""
+
+#: internal/tun/tun.go:207
+msgid "failed to enable promiscuous mode: %v"
+msgstr ""
+
+#: internal/tun/tun.go:210
+msgid "failed to enable address spoofing: %v"
+msgstr ""
+
+#: internal/tun/tun.go:236
+msgid "[TUN] NAT rule matched: %s -> %s (offset: %d)"
+msgstr ""
+
+#: internal/tun/tun.go:244
+msgid "[TUN] TCP request received -> %s (original target: %s:%d)"
+msgstr ""
+
+#: internal/tun/tun.go:249
+msgid "Failed to create a TCP endpoint: %v"
+msgstr ""
+
+#: internal/tun/tun.go:268
+msgid "[TUN] Failed to create a UDP endpoint: %v"
+msgstr ""
+
+#: internal/tun/tun.go:301
+msgid "[TUN] Failed to connect to remote DNS %s: %v"
+msgstr ""
+
+#: internal/tun/tun.go:330
+msgid "[TUN] Failed to connect to target %s: %v"
+msgstr ""
+
+#: internal/tun/tun.go:334
+msgid "[TUN] Tunnel established: %s <-> %s"
+msgstr ""
+
+#: internal/tun/tun.go:379
+msgid "[TUN] Device read error: %v"
+msgstr ""
+
+#: internal/tun/tun.go:414
+msgid "[TUN] Device write error: %v"
+msgstr ""
+
+#: internal/tun/tun.go:421
+msgid "[TUN] Configuring IP address for %s: %s"
+msgstr ""
+
+#: internal/tun/tun.go:425
+msgid "ip addr add: %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:429
+msgid "ip link set: %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:435
+msgid "[TUN] Configuring routes: %v"
+msgstr ""
+
+#: internal/tun/tun.go:438
+msgid "failed to add route %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:445
+msgid "[TUN] Configuring global routes..."
+msgstr ""
+
+#: internal/tun/tun.go:448
+msgid "failed to get the default gateway: %w"
+msgstr ""
+
+#: internal/tun/tun.go:450
+msgid "[TUN] Default gateway detected: %s"
+msgstr ""
+
+#: internal/tun/tun.go:459
+msgid "failed to resolve the SSH server IP address: %w"
+msgstr ""
+
+#: internal/tun/tun.go:462
+msgid "SSH server IP address was not found"
+msgstr ""
+
+#: internal/tun/tun.go:472
+msgid "SSH server has no IPv4 address"
+msgstr ""
+
+#: internal/tun/tun.go:474
+msgid "[TUN] Adding bypass route for SSH server %s (%s) via %s"
+msgstr ""
+
+#: internal/tun/tun.go:477
+msgid "failed to add SSH bypass route: %w"
+msgstr ""
+
+#: internal/tun/tun.go:480
+msgid "[TUN] Adding global routes (0.0.0.0/1, 128.0.0.0/1)..."
+msgstr ""
+
+#: internal/tun/tun.go:482
+msgid "failed to add route 0.0.0.0/1: %w"
+msgstr ""
+
+#: internal/tun/tun.go:485
+msgid "failed to add route 128.0.0.0/1: %w"
+msgstr ""
+
+#: internal/tun/tun.go:503
+msgid "[TUN] Route already exists; ignoring: %s"
+msgstr ""
+
+#: internal/tun/tun.go:506
+msgid "ip %s: %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:521
+msgid "default gateway not found"
+msgstr ""
+
+#: internal/tun/tun.go:527
+msgid "[TUN] Failed to list network interfaces; skipping conflict checks: %v"
+msgstr ""
+
+#: internal/tun/tun.go:546
+msgid "SSH server IP %s is inside route subnet %s"
+msgstr ""
+
+#: internal/tun/tun.go:569
+msgid "[TUN] Route conflict warning: requested route %s contains IP %s of interface %s. Traffic may use the physical interface."
+msgstr ""
+
+#: internal/tun/tun.go:592
+msgid "expected an IPv4 address"
+msgstr ""
+
+#: internal/tun/tun.go:606
+msgid "IPv4 address overflow"
+msgstr ""
+
+#: internal/tun/tun.go:61
+msgid "invalid TUN CIDR %s: %w"
+msgstr ""
+
+#: internal/tun/tun.go:621
+msgid "negative IPv4 address offset"
+msgstr ""
+
+#: internal/tun/tun.go:65
+msgid "only IPv4 TUN addresses are supported: %s"
+msgstr ""
+
+#: internal/tun/tun.go:70
+msgid "invalid IPv4 mask in TUN CIDR: %s"
+msgstr ""
+
+#: internal/tun/tun.go:75
+msgid "failed to select a peer address in subnet %s"
+msgstr ""
+
+#: internal/utils/password.go:20
+msgid "failed to read the password: %w"
+msgstr ""
+
+#: internal/utils/password.go:32
+msgid "no password was configured and interactive authentication is disabled"
+msgstr ""
+
+#: internal/utils/password.go:35
+msgid "Enter password for %s@%s: "
+msgstr ""

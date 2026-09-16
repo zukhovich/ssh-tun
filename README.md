@@ -125,12 +125,14 @@ Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode require
 
 ## Language
 
+ssh-tun uses standard gettext locale selection. It checks `LANGUAGE`, `LC_ALL`, `LC_MESSAGES`, and `LANG` in that order. For example:
+
 ```sh
-ssh-tun --lang en --help
-ssh-tun --lang ru --help
+LANGUAGE=ru ssh-tun --help
+LANGUAGE=en ssh-tun --help
 ```
 
-The `language` YAML field accepts `en` or `ru`. Without a configuration file or `--lang`, English is used by default regardless of the system locale.
+With a Russian system locale such as `LANG=ru_RU.UTF-8`, no override is needed. A legacy `language` field in version 1 YAML files is accepted for compatibility but ignored.
 
 ## Automatic Reconnection
 

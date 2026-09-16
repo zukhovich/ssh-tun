@@ -88,14 +88,14 @@ func (p *HTTPOverSSH) Start() error {
 	listener, err := net.Listen("tcp", p.cfg.ListenAddr)
 	if err != nil {
 		p.mu.Unlock()
-		err = fmt.Errorf(i18n.Text("failed to start the HTTP proxy: %w", "не удалось запустить HTTP-прокси: %w"), err)
+		err = fmt.Errorf(i18n.T("failed to start the HTTP proxy: %w"), err)
 		p.signalStarted(err)
 		return err
 	}
 	p.listener = listener
 	p.mu.Unlock()
 	p.signalStarted(nil)
-	p.logger.Infof(i18n.Text("HTTP/HTTPS proxy is listening on %s", "HTTP/HTTPS-прокси запущен на %s"), listener.Addr())
+	p.logger.Infof(i18n.T("HTTP/HTTPS proxy is listening on %s"), listener.Addr())
 	err = p.server.Serve(listener)
 	if errors.Is(err, http.ErrServerClosed) || errors.Is(err, net.ErrClosed) {
 		return nil
@@ -120,13 +120,13 @@ func (p *HTTPOverSSH) action(host string) router.Action {
 
 func (p *HTTPOverSSH) handlePlainHTTP(w http.ResponseWriter, req *http.Request) {
 	if !req.URL.IsAbs() {
-		http.Error(w, "Требуется абсолютный URL", http.StatusBadRequest)
+		http.Error(w, i18n.T("Absolute URL is required"), http.StatusBadRequest)
 		return
 	}
 	action := p.action(req.Host)
 	if action == router.ActionReject {
-		p.logger.Infof(i18n.Text("Request rejected by a routing rule: %s", "Запрос отклонён правилом маршрутизации: %s"), req.Host)
-		http.Error(w, "Запрос отклонён правилами маршрутизации", http.StatusForbidden)
+		p.logger.Infof(i18n.T("Request rejected by a routing rule: %s"), req.Host)
+		http.Error(w, i18n.T("Request rejected by routing rules"), http.StatusForbidden)
 		return
 	}
 	if action == router.ActionDirect {
@@ -142,12 +142,12 @@ func (p *HTTPOverSSH) handlePlainHTTP(w http.ResponseWriter, req *http.Request) 
 	ctx, cancel := context.WithTimeout(req.Context(), p.cfg.Timeout)
 	defer cancel()
 	if p.ssh == nil {
-		http.Error(w, "SSH-клиент не готов", http.StatusBadGateway)
+		http.Error(w, i18n.T("SSH client is not ready"), http.StatusBadGateway)
 		return
 	}
 	conn, err := p.ssh.DialContext(ctx, "tcp", target)
 	if err != nil {
-		http.Error(w, "Не удалось подключиться к цели через SSH", http.StatusBadGateway)
+		http.Error(w, i18n.T("Failed to connect to target through SSH"), http.StatusBadGateway)
 		return
 	}
 	defer conn.Close()
@@ -156,12 +156,12 @@ func (p *HTTPOverSSH) handlePlainHTTP(w http.ResponseWriter, req *http.Request) 
 	outReq.RequestURI = ""
 	removeHopHeaders(outReq.Header)
 	if err := outReq.Write(conn); err != nil {
-		http.Error(w, "Ошибка отправки запроса", http.StatusBadGateway)
+		http.Error(w, i18n.T("Failed to send request"), http.StatusBadGateway)
 		return
 	}
 	resp, err := http.ReadResponse(bufio.NewReader(conn), outReq)
 	if err != nil {
-		http.Error(w, "Ошибка чтения ответа", http.StatusBadGateway)
+		http.Error(w, i18n.T("Failed to read response"), http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
@@ -175,7 +175,7 @@ func (p *HTTPOverSSH) handleDirect(w http.ResponseWriter, req *http.Request) {
 	removeHopHeaders(outReq.Header)
 	resp, err := p.transport.RoundTrip(outReq)
 	if err != nil {
-		http.Error(w, "Не удалось выполнить прямой запрос", http.StatusServiceUnavailable)
+		http.Error(w, i18n.T("Failed to perform direct request"), http.StatusServiceUnavailable)
 		return
 	}
 	defer resp.Body.Close()
@@ -196,12 +196,12 @@ func copyResponse(w http.ResponseWriter, resp *http.Response) {
 func (p *HTTPOverSSH) handleConnect(w http.ResponseWriter, req *http.Request) {
 	action := p.action(req.Host)
 	if action == router.ActionReject {
-		http.Error(w, "Соединение отклонено правилами маршрутизации", http.StatusForbidden)
+		http.Error(w, i18n.T("Connection rejected by routing rules"), http.StatusForbidden)
 		return
 	}
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		http.Error(w, "Перехват соединения не поддерживается", http.StatusInternalServerError)
+		http.Error(w, i18n.T("Connection hijacking is not supported"), http.StatusInternalServerError)
 		return
 	}
 	target := addressWithDefaultPort(req.Host, "443")
@@ -213,13 +213,13 @@ func (p *HTTPOverSSH) handleConnect(w http.ResponseWriter, req *http.Request) {
 		upstream, err = (&net.Dialer{Timeout: p.cfg.Timeout}).DialContext(ctx, "tcp", target)
 	} else {
 		if p.ssh == nil {
-			http.Error(w, "SSH-клиент не готов", http.StatusBadGateway)
+			http.Error(w, i18n.T("SSH client is not ready"), http.StatusBadGateway)
 			return
 		}
 		upstream, err = p.ssh.DialContext(ctx, "tcp", target)
 	}
 	if err != nil {
-		http.Error(w, "Не удалось подключиться к цели", http.StatusBadGateway)
+		http.Error(w, i18n.T("Failed to connect to target"), http.StatusBadGateway)
 		return
 	}
 	client, rw, err := hijacker.Hijack()
@@ -250,7 +250,7 @@ func relay(left net.Conn, leftReader io.Reader, right net.Conn, rightReader io.R
 	copyOne := func(dst net.Conn, src io.Reader) {
 		defer wg.Done()
 		if _, err := io.Copy(dst, src); err != nil && !isConnectionClosed(err) {
-			log.Debugf(i18n.Text("Data transfer error: %v", "Ошибка передачи данных: %v"), err)
+			log.Debugf(i18n.T("Data transfer error: %v"), err)
 		}
 		if closer, ok := dst.(interface{ CloseWrite() error }); ok {
 			_ = closer.CloseWrite()

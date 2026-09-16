@@ -58,21 +58,21 @@ type TunService struct {
 func NewTunService(cfg *config.Config, log *logger.Logger, sshClient *proxy.SSHClient, r *router.Router) (*TunService, error) {
 	ip, ipNet, err := net.ParseCIDR(cfg.TunCIDR)
 	if err != nil {
-		return nil, fmt.Errorf("неверный TUN CIDR %s: %w", cfg.TunCIDR, err)
+		return nil, fmt.Errorf(i18n.T("invalid TUN CIDR %s: %w"), cfg.TunCIDR, err)
 	}
 	tunIP := ip.To4()
 	if tunIP == nil {
-		return nil, fmt.Errorf("поддерживаются только IPv4 TUN адреса: %s", cfg.TunCIDR)
+		return nil, fmt.Errorf(i18n.T("only IPv4 TUN addresses are supported: %s"), cfg.TunCIDR)
 	}
 
 	prefix, bits := ipNet.Mask.Size()
 	if bits != 32 {
-		return nil, fmt.Errorf("неверная маска IPv4 в TUN CIDR: %s", cfg.TunCIDR)
+		return nil, fmt.Errorf(i18n.T("invalid IPv4 mask in TUN CIDR: %s"), cfg.TunCIDR)
 	}
 
 	peerIP, err := ipAdd(tunIP, 1)
 	if err != nil || !ipNet.Contains(peerIP) {
-		return nil, fmt.Errorf("не удалось выбрать адрес узла в подсети %s", cfg.TunCIDR)
+		return nil, fmt.Errorf(i18n.T("failed to select a peer address in subnet %s"), cfg.TunCIDR)
 	}
 
 	return &TunService{
@@ -97,7 +97,7 @@ func (t *TunService) Start() error {
 
 	dev, err := tun.CreateTUN(devName, 1500)
 	if err != nil {
-		return fmt.Errorf("не удалось создать TUN-устройство: %w", err)
+		return fmt.Errorf(i18n.T("failed to create TUN device: %w"), err)
 	}
 	t.dev = dev
 	cleanup := true
@@ -109,7 +109,7 @@ func (t *TunService) Start() error {
 
 	realName, err := dev.Name()
 	if err == nil {
-		t.logger.Infof(i18n.Text("[TUN] Device created: %s", "[TUN] Устройство создано: %s"), realName)
+		t.logger.Infof(i18n.T("[TUN] Device created: %s"), realName)
 	} else {
 		realName = "ssh-tun"
 	}
@@ -117,7 +117,7 @@ func (t *TunService) Start() error {
 
 	if err := t.setupTunIP(realName); err != nil {
 		dev.Close()
-		return fmt.Errorf("не удалось настроить IP-адрес TUN: %w", err)
+		return fmt.Errorf(i18n.T("failed to configure TUN IP address: %w"), err)
 	}
 
 	if err := t.checkRouteConflicts(); err != nil {
@@ -129,19 +129,19 @@ func (t *TunService) Start() error {
 
 	if t.global {
 		if err := t.setupGlobalRoutes(realName); err != nil {
-			return fmt.Errorf("не удалось настроить глобальные маршруты: %w", err)
+			return fmt.Errorf(i18n.T("failed to configure global routes: %w"), err)
 		}
 	} else if len(t.routes) > 0 {
 		if err := t.setupRoutes(realName); err != nil {
-			return fmt.Errorf("не удалось настроить маршруты: %w", err)
+			return fmt.Errorf(i18n.T("failed to configure routes: %w"), err)
 		}
 	}
 
 	for _, sas := range t.cfg.SubnetAliases {
 		cidr := sas.Src.String()
-		t.logger.Infof(i18n.Text("[TUN] Adding subnet alias route: %s -> TUN", "[TUN] Добавление псевдонима маршрута: %s -> TUN"), cidr)
+		t.logger.Infof(i18n.T("[TUN] Adding subnet alias route: %s -> TUN"), cidr)
 		if err := t.addDeviceRoute(cidr, realName); err != nil {
-			return fmt.Errorf("не удалось добавить маршрут NAT %s: %w", cidr, err)
+			return fmt.Errorf(i18n.T("failed to add NAT route %s: %w"), cidr, err)
 		}
 	}
 
@@ -149,7 +149,7 @@ func (t *TunService) Start() error {
 	go t.pumpTunToStack()
 	go t.pumpStackToTun()
 
-	t.logger.Infof(i18n.Text("[TUN] Mode started: IP address %s, peer address %s", "[TUN] Режим успешно запущен: IP-адрес %s, адрес узла %s"), t.tunIP, t.peerIP)
+	t.logger.Infof(i18n.T("[TUN] Mode started: IP address %s, peer address %s"), t.tunIP, t.peerIP)
 
 	cleanup = false
 	return nil
@@ -169,7 +169,7 @@ func (t *TunService) Close() error {
 		for i := len(t.addedRoutes) - 1; i >= 0; i-- {
 			args := append([]string{"route", "del"}, t.addedRoutes[i]...)
 			if output, err := t.runCommand(args...); err != nil && !strings.Contains(string(output), "No such process") {
-				closeErr = fmt.Errorf("не удалось удалить маршрут %v: %s: %w", t.addedRoutes[i], strings.TrimSpace(string(output)), err)
+				closeErr = fmt.Errorf(i18n.T("failed to remove route %v: %s: %w"), t.addedRoutes[i], strings.TrimSpace(string(output)), err)
 			}
 		}
 	})
@@ -187,7 +187,7 @@ func (t *TunService) initNetstack() error {
 	t.endpoint = e
 
 	if err := s.CreateNIC(1, e); err != nil {
-		return fmt.Errorf("не удалось создать NIC: %v", err)
+		return fmt.Errorf(i18n.T("failed to create NIC: %v"), err)
 	}
 
 	parsedIP := net.ParseIP(t.tunIP)
@@ -200,14 +200,14 @@ func (t *TunService) initNetstack() error {
 		},
 	}
 	if err := s.AddProtocolAddress(1, protocolAddr, stack.AddressProperties{}); err != nil {
-		return fmt.Errorf("не удалось добавить адрес протокола: %v", err)
+		return fmt.Errorf(i18n.T("failed to add protocol address: %v"), err)
 	}
 
 	if err := s.SetPromiscuousMode(1, true); err != nil {
-		return fmt.Errorf("не удалось установить неразборчивый режим: %v", err)
+		return fmt.Errorf(i18n.T("failed to enable promiscuous mode: %v"), err)
 	}
 	if err := s.SetSpoofing(1, true); err != nil {
-		return fmt.Errorf("не удалось включить подмену адресов: %v", err)
+		return fmt.Errorf(i18n.T("failed to enable address spoofing: %v"), err)
 	}
 
 	s.SetRouteTable([]tcpip.Route{
@@ -233,7 +233,7 @@ func (t *TunService) initNetstack() error {
 						offset, _ := ipSub(parsedDestIP, rule.Src.IP)
 						realTargetIP, _ := ipAdd(rule.Dst.IP, offset)
 						targetHost = realTargetIP.String()
-						t.logger.Infof(i18n.Text("[TUN] NAT rule matched: %s -> %s (offset: %d)", "[TUN] Сработало NAT-правило: %s -> %s (смещение: %d)"), destIP, targetHost, offset)
+						t.logger.Infof(i18n.T("[TUN] NAT rule matched: %s -> %s (offset: %d)"), destIP, targetHost, offset)
 						break
 					}
 				}
@@ -241,12 +241,12 @@ func (t *TunService) initNetstack() error {
 		}
 
 		targetAddr := fmt.Sprintf("%s:%d", targetHost, destPort)
-		t.logger.Infof(i18n.Text("[TUN] TCP request received -> %s (original target: %s:%d)", "[TUN] Получен TCP-запрос -> %s (исходная цель: %s:%d)"), targetAddr, destIP, destPort)
+		t.logger.Infof(i18n.T("[TUN] TCP request received -> %s (original target: %s:%d)"), targetAddr, destIP, destPort)
 
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			t.logger.Errorf(i18n.Text("Failed to create a TCP endpoint: %v", "Не удалось создать конечную точку TCP: %v"), err)
+			t.logger.Errorf(i18n.T("Failed to create a TCP endpoint: %v"), err)
 			r.Complete(true)
 			return
 		}
@@ -265,7 +265,7 @@ func (t *TunService) initNetstack() error {
 		var wq waiter.Queue
 		ep, err := r.CreateEndpoint(&wq)
 		if err != nil {
-			t.logger.Errorf(i18n.Text("[TUN] Failed to create a UDP endpoint: %v", "[TUN] Не удалось создать конечную точку UDP: %v"), err)
+			t.logger.Errorf(i18n.T("[TUN] Failed to create a UDP endpoint: %v"), err)
 			return true
 		}
 
@@ -298,7 +298,7 @@ func (t *TunService) handleUDPForward(conn *gonet.UDPConn, targetIP string, targ
 	}
 	remoteConn, err := t.dial(targetIP, targetAddr)
 	if err != nil {
-		t.logger.Warnf(i18n.Text("[TUN] Failed to connect to remote DNS %s: %v", "[TUN] Не удалось подключиться к удалённому DNS %s: %v"), targetAddr, err)
+		t.logger.Warnf(i18n.T("[TUN] Failed to connect to remote DNS %s: %v"), targetAddr, err)
 		return
 	}
 	defer remoteConn.Close()
@@ -327,11 +327,11 @@ func (t *TunService) handleTCPForward(localConn net.Conn, targetAddr string) {
 	}
 	remoteConn, err := t.dial(host, targetAddr)
 	if err != nil {
-		t.logger.Warnf(i18n.Text("[TUN] Failed to connect to target %s: %v", "[TUN] Не удалось подключиться к цели %s: %v"), targetAddr, err)
+		t.logger.Warnf(i18n.T("[TUN] Failed to connect to target %s: %v"), targetAddr, err)
 		return
 	}
 	defer remoteConn.Close()
-	t.logger.Infof(i18n.Text("[TUN] Tunnel established: %s <-> %s", "[TUN] Туннель установлен: %s <-> %s"), localConn.RemoteAddr(), targetAddr)
+	t.logger.Infof(i18n.T("[TUN] Tunnel established: %s <-> %s"), localConn.RemoteAddr(), targetAddr)
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
@@ -376,7 +376,7 @@ func (t *TunService) pumpTunToStack() {
 			if strings.Contains(err.Error(), "file already closed") || strings.Contains(err.Error(), "closed network connection") {
 				return
 			}
-			t.logger.Errorf(i18n.Text("[TUN] Device read error: %v", "[TUN] Ошибка чтения устройства: %v"), err)
+			t.logger.Errorf(i18n.T("[TUN] Device read error: %v"), err)
 			return
 		}
 
@@ -411,43 +411,43 @@ func (t *TunService) pumpStackToTun() {
 			if strings.Contains(err.Error(), "file already closed") || strings.Contains(err.Error(), "closed network connection") {
 				return
 			}
-			t.logger.Errorf(i18n.Text("[TUN] Device write error: %v", "[TUN] Ошибка записи на устройство: %v"), err)
+			t.logger.Errorf(i18n.T("[TUN] Device write error: %v"), err)
 			return
 		}
 	}
 }
 
 func (t *TunService) setupTunIP(devName string) error {
-	t.logger.Infof(i18n.Text("[TUN] Configuring IP address for %s: %s", "[TUN] Настройка IP-адреса %s: %s"), devName, t.tunIP)
+	t.logger.Infof(i18n.T("[TUN] Configuring IP address for %s: %s"), devName, t.tunIP)
 
 	output, err := t.runCommand("addr", "add", fmt.Sprintf("%s/%d", t.tunIP, t.prefix), "dev", devName)
 	if err != nil {
-		return fmt.Errorf("ip addr add: %s: %w", strings.TrimSpace(string(output)), err)
+		return fmt.Errorf(i18n.T("ip addr add: %s: %w"), strings.TrimSpace(string(output)), err)
 	}
 	output, err = t.runCommand("link", "set", devName, "up")
 	if err != nil {
-		return fmt.Errorf("ip link set: %s: %w", strings.TrimSpace(string(output)), err)
+		return fmt.Errorf(i18n.T("ip link set: %s: %w"), strings.TrimSpace(string(output)), err)
 	}
 	return nil
 }
 
 func (t *TunService) setupRoutes(devName string) error {
-	t.logger.Infof(i18n.Text("[TUN] Configuring routes: %v", "[TUN] Настройка маршрутов: %v"), t.routes)
+	t.logger.Infof(i18n.T("[TUN] Configuring routes: %v"), t.routes)
 	for _, cidr := range t.routes {
 		if err := t.addDeviceRoute(cidr, devName); err != nil {
-			return fmt.Errorf("ошибка добавления маршрута %s: %w", cidr, err)
+			return fmt.Errorf(i18n.T("failed to add route %s: %w"), cidr, err)
 		}
 	}
 	return nil
 }
 
 func (t *TunService) setupGlobalRoutes(devName string) error {
-	t.logger.Info(i18n.Text("[TUN] Configuring global routes...", "[TUN] Настройка глобальных маршрутов..."))
+	t.logger.Info(i18n.T("[TUN] Configuring global routes..."))
 	gateway, err := t.getDefaultGateway()
 	if err != nil {
-		return fmt.Errorf("не удалось получить шлюз по умолчанию: %w", err)
+		return fmt.Errorf(i18n.T("failed to get the default gateway: %w"), err)
 	}
-	t.logger.Infof(i18n.Text("[TUN] Default gateway detected: %s", "[TUN] Обнаружен шлюз по умолчанию: %s"), gateway)
+	t.logger.Infof(i18n.T("[TUN] Default gateway detected: %s"), gateway)
 
 	sshHost := t.cfg.SSHServer
 	if host, _, err := net.SplitHostPort(sshHost); err == nil {
@@ -456,10 +456,10 @@ func (t *TunService) setupGlobalRoutes(devName string) error {
 
 	sshIPs, err := net.LookupIP(sshHost)
 	if err != nil {
-		return fmt.Errorf("не удалось определить IP-адрес SSH-сервера: %w", err)
+		return fmt.Errorf(i18n.T("failed to resolve the SSH server IP address: %w"), err)
 	}
 	if len(sshIPs) == 0 {
-		return fmt.Errorf("IP SSH-сервера не найден")
+		return errors.New(i18n.T("SSH server IP address was not found"))
 	}
 	var targetSSHIP string
 	for _, ip := range sshIPs {
@@ -469,20 +469,20 @@ func (t *TunService) setupGlobalRoutes(devName string) error {
 		}
 	}
 	if targetSSHIP == "" {
-		return fmt.Errorf("у SSH-сервера нет IPv4-адреса")
+		return errors.New(i18n.T("SSH server has no IPv4 address"))
 	}
-	t.logger.Infof(i18n.Text("[TUN] Adding bypass route for SSH server %s (%s) via %s", "[TUN] Добавление обходного маршрута для SSH-сервера %s (%s) через %s"), sshHost, targetSSHIP, gateway)
+	t.logger.Infof(i18n.T("[TUN] Adding bypass route for SSH server %s (%s) via %s"), sshHost, targetSSHIP, gateway)
 
 	if err := t.addGatewayRoute(targetSSHIP, gateway); err != nil {
-		return fmt.Errorf("не удалось добавить обходной маршрут SSH: %w", err)
+		return fmt.Errorf(i18n.T("failed to add SSH bypass route: %w"), err)
 	}
 
-	t.logger.Info(i18n.Text("[TUN] Adding global routes (0.0.0.0/1, 128.0.0.0/1)...", "[TUN] Добавление глобальных маршрутов (0.0.0.0/1, 128.0.0.0/1)..."))
+	t.logger.Info(i18n.T("[TUN] Adding global routes (0.0.0.0/1, 128.0.0.0/1)..."))
 	if err := t.addDeviceRoute("0.0.0.0/1", devName); err != nil {
-		return fmt.Errorf("не удалось добавить маршрут 0.0.0.0/1: %w", err)
+		return fmt.Errorf(i18n.T("failed to add route 0.0.0.0/1: %w"), err)
 	}
 	if err := t.addDeviceRoute("128.0.0.0/1", devName); err != nil {
-		return fmt.Errorf("не удалось добавить маршрут 128.0.0.0/1: %w", err)
+		return fmt.Errorf(i18n.T("failed to add route 128.0.0.0/1: %w"), err)
 	}
 	return nil
 }
@@ -500,10 +500,10 @@ func (t *TunService) addRoute(routeArgs []string) error {
 	if output, err := t.runCommand(args...); err != nil {
 		outStr := string(output)
 		if strings.Contains(outStr, "File exists") || strings.Contains(outStr, "exist") {
-			t.logger.Warnf(i18n.Text("[TUN] Route already exists; ignoring: %s", "[TUN] Маршрут уже существует, игнорирование: %s"), outStr)
+			t.logger.Warnf(i18n.T("[TUN] Route already exists; ignoring: %s"), outStr)
 			return nil
 		}
-		return fmt.Errorf("ip %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(outStr), err)
+		return fmt.Errorf(i18n.T("ip %s: %s: %w"), strings.Join(args, " "), strings.TrimSpace(outStr), err)
 	}
 	t.addedRoutes = append(t.addedRoutes, append([]string(nil), routeArgs...))
 	return nil
@@ -518,13 +518,13 @@ func (t *TunService) getDefaultGateway() (string, error) {
 	if len(parts) >= 3 && parts[0] == "default" && parts[1] == "via" {
 		return parts[2], nil
 	}
-	return "", fmt.Errorf("шлюз по умолчанию не найден")
+	return "", errors.New(i18n.T("default gateway not found"))
 }
 
 func (t *TunService) checkRouteConflicts() error {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		t.logger.Warnf(i18n.Text("[TUN] Failed to list network interfaces; skipping conflict checks: %v", "[TUN] Не удалось получить список сетевых интерфейсов, пропуск проверки конфликтов: %v"), err)
+		t.logger.Warnf(i18n.T("[TUN] Failed to list network interfaces; skipping conflict checks: %v"), err)
 		return nil
 	}
 
@@ -543,7 +543,7 @@ func (t *TunService) checkRouteConflicts() error {
 		for _, sshIP := range sshIPs {
 			sshIPV4 := sshIP.To4()
 			if sshIPV4 != nil && network.Contains(sshIPV4) {
-				return fmt.Errorf("IP SSH-сервера %s входит в подсеть маршрута %s", sshIPV4, targetCIDR)
+				return fmt.Errorf(i18n.T("SSH server IP %s is inside route subnet %s"), sshIPV4, targetCIDR)
 			}
 		}
 
@@ -566,7 +566,7 @@ func (t *TunService) checkRouteConflicts() error {
 				}
 
 				if network.Contains(ip) {
-					t.logger.Warnf(i18n.Text("[TUN] Route conflict warning: requested route %s contains IP %s of interface %s. Traffic may use the physical interface.", "[TUN] Предупреждение о конфликте маршрутов: запрошенный маршрут %s содержит IP %s интерфейса %s. Трафик может пойти через физический интерфейс."), targetCIDR, ip.String(), iface.Name)
+					t.logger.Warnf(i18n.T("[TUN] Route conflict warning: requested route %s contains IP %s of interface %s. Traffic may use the physical interface."), targetCIDR, ip.String(), iface.Name)
 				}
 			}
 		}
@@ -589,7 +589,7 @@ func (t *TunService) checkRouteConflicts() error {
 func ipToUint32(ip net.IP) (uint32, error) {
 	ip = ip.To4()
 	if ip == nil {
-		return 0, errors.New("ожидался IPv4-адрес")
+		return 0, errors.New(i18n.T("expected an IPv4 address"))
 	}
 	return binary.BigEndian.Uint32(ip), nil
 }
@@ -603,7 +603,7 @@ func uint32ToIP(n uint32) net.IP {
 func ipAdd(ip net.IP, offset uint32) (net.IP, error) {
 	val, err := ipToUint32(ip)
 	if err != nil || offset > ^uint32(0)-val {
-		return nil, errors.New("переполнение IPv4-адреса")
+		return nil, errors.New(i18n.T("IPv4 address overflow"))
 	}
 	return uint32ToIP(val + offset), nil
 }
@@ -618,7 +618,7 @@ func ipSub(a, b net.IP) (uint32, error) {
 		return 0, err
 	}
 	if av < bv {
-		return 0, errors.New("отрицательное смещение IPv4-адреса")
+		return 0, errors.New(i18n.T("negative IPv4 address offset"))
 	}
 	return av - bv, nil
 }

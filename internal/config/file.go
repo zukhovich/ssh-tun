@@ -1,18 +1,20 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
+	"github.com/zukhovich/ssh-tun/internal/i18n"
 	"gopkg.in/yaml.v3"
 )
 
 type File struct {
-	Version  int    `yaml:"version"`
-	Language string `yaml:"language"`
-	SSH      struct {
+	Version        int    `yaml:"version"`
+	LegacyLanguage string `yaml:"language"` // Deprecated: accepted for v1 compatibility, ignored.
+	SSH            struct {
 		Target            string   `yaml:"target"`
 		Port              string   `yaml:"port"`
 		Password          string   `yaml:"password"`
@@ -56,26 +58,26 @@ type File struct {
 	} `yaml:"service"`
 }
 
-func LoadFile(path string) (*Config, string, []string, error) {
+func LoadFile(path string) (*Config, []string, error) {
 	input, err := os.Open(path)
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("open configuration: %w", err)
+		return nil, nil, fmt.Errorf(i18n.T("open configuration: %w"), err)
 	}
 	defer input.Close()
 	var file File
 	decoder := yaml.NewDecoder(input)
 	decoder.KnownFields(true)
 	if err := decoder.Decode(&file); err != nil {
-		return nil, "", nil, fmt.Errorf("decode configuration: %w", err)
+		return nil, nil, fmt.Errorf(i18n.T("decode configuration: %w"), err)
 	}
 	var extra any
 	if err := decoder.Decode(&extra); err == nil {
-		return nil, "", nil, fmt.Errorf("decode configuration: multiple YAML documents are not allowed")
+		return nil, nil, errors.New(i18n.T("decode configuration: multiple YAML documents are not allowed"))
 	} else if err != io.EOF {
-		return nil, "", nil, fmt.Errorf("decode configuration: %w", err)
+		return nil, nil, fmt.Errorf(i18n.T("decode configuration: %w"), err)
 	}
 	if file.Version != 0 && file.Version != 1 {
-		return nil, "", nil, fmt.Errorf("unsupported configuration version %d", file.Version)
+		return nil, nil, fmt.Errorf(i18n.T("unsupported configuration version %d"), file.Version)
 	}
 	cfg := NewConfig()
 	cfg.SSHServer = file.SSH.Target
@@ -90,7 +92,7 @@ func LoadFile(path string) (*Config, string, []string, error) {
 	if file.SSH.Timeout != "" {
 		cfg.Timeout, err = time.ParseDuration(file.SSH.Timeout)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("invalid ssh.timeout: %w", err)
+			return nil, nil, fmt.Errorf(i18n.T("invalid ssh.timeout: %w"), err)
 		}
 	}
 	if file.SSH.AutoReconnect != nil {
@@ -99,13 +101,13 @@ func LoadFile(path string) (*Config, string, []string, error) {
 	if file.SSH.ReconnectInterval != "" {
 		cfg.ReconnectInterval, err = time.ParseDuration(file.SSH.ReconnectInterval)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("invalid ssh.reconnect_interval: %w", err)
+			return nil, nil, fmt.Errorf(i18n.T("invalid ssh.reconnect_interval: %w"), err)
 		}
 	}
 	if file.SSH.KeepAliveInterval != "" {
 		cfg.KeepAliveInterval, err = time.ParseDuration(file.SSH.KeepAliveInterval)
 		if err != nil {
-			return nil, "", nil, fmt.Errorf("invalid ssh.keepalive_interval: %w", err)
+			return nil, nil, fmt.Errorf(i18n.T("invalid ssh.keepalive_interval: %w"), err)
 		}
 	}
 	if file.Proxy.HTTP != "" {
@@ -139,7 +141,7 @@ func LoadFile(path string) (*Config, string, []string, error) {
 	if file.Service.Start != nil {
 		cfg.ServiceStart = *file.Service.Start
 	}
-	return cfg, file.Language, file.TUN.NAT, nil
+	return cfg, file.TUN.NAT, nil
 }
 
 // Template returns a complete configuration template for the current OS.
@@ -152,7 +154,6 @@ func Template(goos string) string {
 }
 
 const template = `version: 1
-language: en
 
 ssh:
   target: user@example.com

@@ -1,0 +1,22 @@
+source_lang: en
+languages:
+  - ru
+
+provider:
+  id: github-copilot
+  model: gpt-4.1
+
+targets:
+  - name: ssh-tun
+    format: gettext
+    root: .
+    from:
+      - cmd
+      - internal
+    except:
+      - "**/*_test.go"
+      - internal/i18n/locales/**
+    template: po/ssh-tun.pot
+    to: po/{lang}.po
+    keywords:
+      - T
