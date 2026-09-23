@@ -3,7 +3,7 @@
 # This file is distributed under the same license as the ssh-tun package.
 msgid ""
 msgstr ""
-"Project-Id-Version: PACKAGE VERSION\n"
+"Project-Id-Version: ssh-tun\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-09-16 14:36+0000\n"
 "PO-Revision-Date: 2026-09-16 14:12+0000\n"
@@ -1150,6 +1150,82 @@ msgstr "Пароль не задан, а интерактивная аутент
 #: internal/utils/password.go:35
 msgid "Enter password for %s@%s: "
 msgstr "Введите пароль для %s@%s: "
+
+#: cmd/ssh-tun/cli/completion.go
+msgid "Generate shell completion script"
+msgstr "Создать сценарий автодополнения командной оболочки"
+
+#: cmd/ssh-tun/cli/completion.go
+msgid "unsupported shell: %s"
+msgstr "неподдерживаемая командная оболочка: %s"
+
+#: cmd/ssh-tun/cli/root.go
+msgid "OpenSSH client configuration file (default: ~/.ssh/config)"
+msgstr "Файл клиентской конфигурации OpenSSH (по умолчанию: ~/.ssh/config)"
+
+#: cmd/ssh-tun/cli/root.go
+msgid "Remote TCP resource checked through SSH (for example google.com:443)"
+msgstr "Удалённый TCP-ресурс для проверки через SSH (например google.com:443)"
+
+#: cmd/ssh-tun/cli/root.go
+msgid "Remote resource health-check timeout"
+msgstr "Тайм-аут проверки удалённого ресурса"
+
+#: cmd/ssh-tun/cli/root.go
+msgid "SSH target is required ([user@]host or an SSH config alias)"
+msgstr "Требуется SSH-цель ([user@]host или псевдоним из конфигурации SSH)"
+
+#: internal/config/config.go
+msgid "SSH jump host must not be empty"
+msgstr "Промежуточный SSH-узел не может быть пустым"
+
+#: internal/config/config.go
+msgid "health-check timeout must be greater than zero"
+msgstr "тайм-аут проверки подключения должен быть больше нуля"
+
+#: internal/config/config.go
+msgid "invalid health-check target: %w"
+msgstr "некорректный ресурс для проверки подключения: %w"
+
+#: internal/config/file.go
+msgid "invalid ssh.health_check_timeout: %w"
+msgstr "некорректный ssh.health_check_timeout: %w"
+
+#: internal/config/sshconfig.go
+msgid "SSH target is required"
+msgstr "Требуется SSH-цель"
+
+#: internal/config/sshconfig.go
+msgid "SSH host must not be empty"
+msgstr "SSH-узел не может быть пустым"
+
+#: internal/config/sshconfig.go
+msgid "failed to determine the home directory: %w"
+msgstr "не удалось определить домашний каталог: %w"
+
+#: internal/config/sshconfig.go
+msgid "invalid ConnectTimeout in SSH client configuration: %s"
+msgstr "некорректный ConnectTimeout в клиентской конфигурации SSH: %s"
+
+#: internal/config/sshconfig.go
+msgid "invalid SSH target address: %s"
+msgstr "некорректный адрес SSH-цели: %s"
+
+#: internal/config/sshconfig.go
+msgid "invalid SSH target; expected [user@]host or an SSH config alias"
+msgstr "некорректная SSH-цель; ожидается [user@]host или псевдоним из конфигурации SSH"
+
+#: internal/config/sshconfig.go
+msgid "read SSH client configuration: %w"
+msgstr "не удалось прочитать клиентскую конфигурацию SSH: %w"
+
+#: internal/proxy/ssh.go
+msgid "Failed to resolve SSH jump host %s: %v"
+msgstr "Не удалось разрешить промежуточный SSH-узел %s: %v"
+
+#: internal/proxy/ssh.go
+msgid "failed to load configured SSH private keys: %w"
+msgstr "не удалось загрузить настроенные закрытые ключи SSH: %w"
 
 #~ msgid "Interface language: en or ru"
 #~ msgstr "Язык интерфейса: en или ru"

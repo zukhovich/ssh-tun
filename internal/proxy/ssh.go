@@ -37,6 +37,7 @@ type AuthConfig struct {
 	User            string
 	Password        string
 	KeyFile         string
+	KeyFiles        []string
 	ServerAddr      string
 	InteractiveAuth bool
 }
@@ -53,14 +54,28 @@ func getAuthMethods(authCfg *AuthConfig, log *logger.Logger, passwordOnly bool) 
 	}
 
 	if !passwordOnly {
-		// Prefer an explicitly configured private key.
+		// Prefer explicitly configured private keys, including IdentityFile
+		// entries resolved from the OpenSSH client configuration.
+		keyFiles := append([]string(nil), authCfg.KeyFiles...)
 		if authCfg.KeyFile != "" {
-			log.Debugf(i18n.T("Trying the configured SSH private key: %s"), authCfg.KeyFile)
-			signer, err := loadPrivateKey(authCfg.KeyFile, authCfg.InteractiveAuth)
-			if err != nil {
-				return nil, cleanup, fmt.Errorf(i18n.T("failed to load the configured SSH private key: %w"), err)
+			keyFiles = []string{authCfg.KeyFile}
+		}
+		if len(keyFiles) > 0 {
+			var signers []ssh.Signer
+			var keyErrors []error
+			for _, keyFile := range keyFiles {
+				log.Debugf(i18n.T("Trying the configured SSH private key: %s"), keyFile)
+				signer, err := loadPrivateKey(keyFile, authCfg.InteractiveAuth)
+				if err != nil {
+					keyErrors = append(keyErrors, err)
+					continue
+				}
+				signers = append(signers, signer)
 			}
-			authMethods = append(authMethods, ssh.PublicKeys(signer))
+			if len(signers) == 0 {
+				return nil, cleanup, fmt.Errorf(i18n.T("failed to load configured SSH private keys: %w"), errors.Join(keyErrors...))
+			}
+			authMethods = append(authMethods, ssh.PublicKeys(signers...))
 		} else {
 			// Use SSH_AUTH_SOCK when available. This supports passphrase-protected keys
 			// and matches the authentication behavior users expect from OpenSSH.
@@ -131,16 +146,25 @@ func NewSSHClient(cfg *config.Config, log *logger.Logger) (*SSHClient, error) {
 
 	// Connect to jump hosts in order.
 	for i, jumpHostsStr := range cfg.JumpHosts {
-		user, host, port, err := cfg.GetJumpHostInfo(jumpHostsStr)
-		if err != nil {
-			log.Errorf(i18n.T("Failed to parse SSH jump-host parameters: %v"), err)
+		jumpCfg := *config.NewConfig()
+		jumpCfg.SSHConfigFile = cfg.SSHConfigFile
+		jumpCfg.SSHPassword = cfg.SSHPassword
+		jumpCfg.InteractiveAuth = cfg.InteractiveAuth
+		jumpCfg.InsecureHostKey = cfg.InsecureHostKey
+		jumpCfg.Timeout = cfg.Timeout
+		if err := config.ResolveSSHConfig(&jumpCfg, jumpHostsStr); err != nil {
+			log.Errorf(i18n.T("Failed to resolve SSH jump host %s: %v"), jumpHostsStr, err)
 			sshClient.Close()
 			return nil, err
 		}
-		if user == "" {
-			user = cfg.SSHUser
+		server, err := sshAddressWithDefaultPort(jumpCfg.SSHServer, jumpCfg.SSHPort)
+		if err != nil {
+			sshClient.Close()
+			return nil, err
 		}
-		addr := net.JoinHostPort(host, port)
+		jumpCfg.SSHServer = server
+		user := jumpCfg.SSHUser
+		addr := jumpCfg.SSHServer
 		log.Infof(i18n.T("Connecting to SSH jump host %d/%d: %s"), i+1, len(cfg.JumpHosts), addr)
 
 		var lastClient *ssh.Client
@@ -148,7 +172,7 @@ func NewSSHClient(cfg *config.Config, log *logger.Logger) (*SSHClient, error) {
 			lastClient = sshClient.jumpClients[len(sshClient.jumpClients)-1]
 		}
 
-		client, err := connectToHost(cfg, log, user, addr, lastClient)
+		client, err := connectToHost(&jumpCfg, log, user, addr, lastClient)
 		if err != nil {
 			log.Errorf(i18n.T("Failed to connect to SSH jump host %s: %v"), addr, err)
 			sshClient.Close()
@@ -198,7 +222,7 @@ func (s *SSHClient) disconnected() bool {
 // password input is lazy, so a successful key never causes a password prompt.
 func connectToHost(cfg *config.Config, log *logger.Logger, user, addr string, jumpVia *ssh.Client) (*ssh.Client, error) {
 	var auths []ssh.AuthMethod
-	keyAuthCfg := &AuthConfig{User: user, ServerAddr: addr, KeyFile: cfg.SSHKeyFile, InteractiveAuth: cfg.InteractiveAuth}
+	keyAuthCfg := &AuthConfig{User: user, ServerAddr: addr, KeyFile: cfg.SSHKeyFile, KeyFiles: cfg.SSHKeyFiles, InteractiveAuth: cfg.InteractiveAuth}
 	keyAuths, cleanupKeyAuth, keyErr := getAuthMethods(keyAuthCfg, log, false)
 	defer cleanupKeyAuth()
 	if keyErr == nil {
@@ -240,6 +264,19 @@ func connectToHost(cfg *config.Config, log *logger.Logger, user, addr string, ju
 		return nil, errors.New(i18n.T("no SSH authentication methods are available"))
 	}
 	return trySingleConnection(cfg, user, addr, cfg.Timeout, auths, jumpVia)
+}
+
+func sshAddressWithDefaultPort(host, port string) (string, error) {
+	if _, _, err := net.SplitHostPort(host); err == nil {
+		return host, nil
+	}
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		return net.JoinHostPort(strings.TrimSuffix(strings.TrimPrefix(host, "["), "]"), port), nil
+	}
+	if strings.Contains(host, ":") {
+		return "", fmt.Errorf(i18n.T("invalid SSH server address: %s"), host)
+	}
+	return net.JoinHostPort(host, port), nil
 }
 
 // trySingleConnection connects using the supplied authentication methods.
@@ -404,6 +441,19 @@ func (s *SSHClient) keepAlive(timeout time.Duration) bool {
 		s.broken.Store(true)
 		return false
 	}
+}
+
+// checkRemoteResource verifies that a TCP resource is reachable through the
+// SSH tunnel. It detects failures where the SSH transport still responds but
+// remote forwarding no longer works.
+func (s *SSHClient) checkRemoteResource(addr string, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	conn, err := s.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return false
+	}
+	return conn.Close() == nil
 }
 
 // replaceFrom swaps the transport in place so existing proxies observe the

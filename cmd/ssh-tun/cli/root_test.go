@@ -4,19 +4,16 @@ import (
 	"testing"
 )
 
-func TestParseSSHTarget(t *testing.T) {
-	user, host, err := parseSSHTarget("alice@[2001:db8::1]")
-	if err != nil || user != "alice" || host != "[2001:db8::1]" {
-		t.Fatalf("parseSSHTarget = %q, %q, %v", user, host, err)
-	}
-	if _, _, err := parseSSHTarget("alice@@example.com"); err == nil {
-		t.Fatal("multiple @ separators must be rejected")
-	}
-}
-
 func TestLanguageFlagRemoved(t *testing.T) {
 	if flag := rootCmd.PersistentFlags().Lookup("lang"); flag != nil {
 		t.Fatal("--lang must not exist; gettext locale environment controls translations")
+	}
+}
+
+func TestCompletionCommandExists(t *testing.T) {
+	command, _, err := rootCmd.Find([]string{"completion", "bash"})
+	if err != nil || command == rootCmd || command.Name() != "completion" {
+		t.Fatalf("completion command is not registered: %v", err)
 	}
 }
 

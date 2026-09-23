@@ -1138,3 +1138,79 @@ msgstr ""
 #: internal/utils/password.go:35
 msgid "Enter password for %s@%s: "
 msgstr ""
+
+#: cmd/ssh-tun/cli/completion.go
+msgid "Generate shell completion script"
+msgstr ""
+
+#: cmd/ssh-tun/cli/completion.go
+msgid "unsupported shell: %s"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go
+msgid "OpenSSH client configuration file (default: ~/.ssh/config)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go
+msgid "Remote TCP resource checked through SSH (for example google.com:443)"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go
+msgid "Remote resource health-check timeout"
+msgstr ""
+
+#: cmd/ssh-tun/cli/root.go
+msgid "SSH target is required ([user@]host or an SSH config alias)"
+msgstr ""
+
+#: internal/config/config.go
+msgid "SSH jump host must not be empty"
+msgstr ""
+
+#: internal/config/config.go
+msgid "health-check timeout must be greater than zero"
+msgstr ""
+
+#: internal/config/config.go
+msgid "invalid health-check target: %w"
+msgstr ""
+
+#: internal/config/file.go
+msgid "invalid ssh.health_check_timeout: %w"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "SSH target is required"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "SSH host must not be empty"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "failed to determine the home directory: %w"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "invalid ConnectTimeout in SSH client configuration: %s"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "invalid SSH target address: %s"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "invalid SSH target; expected [user@]host or an SSH config alias"
+msgstr ""
+
+#: internal/config/sshconfig.go
+msgid "read SSH client configuration: %w"
+msgstr ""
+
+#: internal/proxy/ssh.go
+msgid "Failed to resolve SSH jump host %s: %v"
+msgstr ""
+
+#: internal/proxy/ssh.go
+msgid "failed to load configured SSH private keys: %w"
+msgstr ""

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.5
+
+- Added OpenSSH client configuration support for host aliases, users, ports, identity files, known-hosts files, jump hosts, and connection timeouts.
+- Added optional end-to-end connection monitoring through a remote TCP resource.
+- Added Bash, Zsh, Fish, and PowerShell completion generation with option, file, and SSH host-alias completion.
+
 ## 1.0.4
 
 - Removed automatic TUN privilege relaunch; TUN now fails clearly when the current process lacks the required privileges.

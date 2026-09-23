@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	Version        = "1.0.4"
+	Version        = "1.0.5"
 	cfg            = config.NewConfig()
 	aliasFlags     []string
 	configPath     string
@@ -40,7 +40,7 @@ var (
 
 // rootCmd is the main application command.
 var rootCmd = &cobra.Command{
-	Use:     "ssh-tun [user@host]",
+	Use:     "ssh-tun [[user@]host|alias]",
 	Version: Version,
 	Short:   i18n.T("Lightweight SSH-based HTTP proxy"),
 	Long:    i18n.T("ssh-tun is a command-line HTTP, SOCKS5, and TUN proxy over SSH.\nIt provides secure access to private networks or uses a remote host as an Internet gateway."),
@@ -115,7 +115,7 @@ var rootCmd = &cobra.Command{
 			applyCLIOverrides(cmd, cfg, &cliConfig, &aliasFlags, cliAliases)
 		}
 		if len(args) == 0 && cfg.SSHServer == "" {
-			return errors.New(i18n.T("SSH target is required (user@host)"))
+			return errors.New(i18n.T("SSH target is required ([user@]host or an SSH config alias)"))
 		}
 		// Enable TUN automatically when global routing, routes, or NAT is configured.
 		if cfg.TunGlobal || len(cfg.TunRoute) > 0 || len(aliasFlags) > 0 {
@@ -126,20 +126,19 @@ var rootCmd = &cobra.Command{
 			return elevationError()
 		}
 
-		// Resolve the SSH user and server from CLI or configuration.
+		// Resolve aliases and connection defaults from the OpenSSH client
+		// configuration. Explicit ssh-tun flags override the resolved values.
+		target := cfg.SSHServer
 		if len(args) > 0 {
-			user, host, err := parseSSHTarget(args[0])
-			if err != nil {
-				return err
-			}
-			cfg.SSHUser, cfg.SSHServer = user, host
-		} else {
-			user, host, err := parseSSHTarget(cfg.SSHServer)
-			if err != nil {
-				return err
-			}
-			cfg.SSHUser, cfg.SSHServer = user, host
+			target = args[0]
 		}
+		requested := *cfg
+		resolved := config.NewConfig()
+		resolved.SSHConfigFile = requested.SSHConfigFile
+		if err := config.ResolveSSHConfig(resolved, target); err != nil {
+			return err
+		}
+		mergeResolvedSSHConfig(cfg, &requested, resolved)
 
 		// Add the default port when needed.
 		if cfg.SSHServer != "" {
@@ -340,6 +339,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfg.SSHPort, "port", "p", "22", i18n.T("SSH server port"))
 	rootCmd.PersistentFlags().StringVar(&cfg.SSHPassword, "pass", "", i18n.T("SSH password (unsafe; interactive authentication is recommended)"))
 	rootCmd.PersistentFlags().StringVarP(&cfg.SSHKeyFile, "identity-file", "i", "", i18n.T("Private key file"))
+	rootCmd.PersistentFlags().StringVarP(&cfg.SSHConfigFile, "ssh-config", "F", "", i18n.T("OpenSSH client configuration file (default: ~/.ssh/config)"))
 	rootCmd.PersistentFlags().StringVar(&cfg.SSHKeyFile, "identity_file", "", i18n.T("Deprecated: use --identity-file"))
 	_ = rootCmd.PersistentFlags().MarkHidden("identity_file")
 	rootCmd.PersistentFlags().StringVar(&cfg.KnownHostsFile, "known-hosts", "", i18n.T("known_hosts file (default: ~/.ssh/known_hosts)"))
@@ -349,6 +349,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&cfg.AutoReconnect, "auto-reconnect", false, i18n.T("Reconnect automatically when the SSH channel is lost"))
 	rootCmd.PersistentFlags().DurationVar(&cfg.ReconnectInterval, "reconnect-interval", 5*time.Second, i18n.T("Delay between SSH reconnect attempts"))
 	rootCmd.PersistentFlags().DurationVar(&cfg.KeepAliveInterval, "keepalive-interval", 15*time.Second, i18n.T("SSH channel health-check interval"))
+	rootCmd.PersistentFlags().StringVar(&cfg.HealthCheckTarget, "health-check-target", "", i18n.T("Remote TCP resource checked through SSH (for example google.com:443)"))
+	rootCmd.PersistentFlags().DurationVar(&cfg.HealthCheckTimeout, "health-check-timeout", 5*time.Second, i18n.T("Remote resource health-check timeout"))
 
 	// Proxy options.
 	rootCmd.PersistentFlags().StringVarP(&cfg.ListenAddr, "listen", "l", ":8080", i18n.T("Local HTTP proxy address (deprecated; use --http)"))
@@ -371,6 +373,8 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&cfg.Verbose, "verbose", "v", false, i18n.T("Enable verbose logging"))
 	rootCmd.PersistentFlags().StringVar(&cfg.LogFile, "log", "", i18n.T("Log file path"))
 	rootCmd.PersistentFlags().StringVar(&cfg.RuleFile, "rules", "", i18n.T("Routing rules file"))
+	rootCmd.AddCommand(newCompletionCommand())
+	registerCompletions()
 }
 
 func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]string, cliAliases []string) {
@@ -382,6 +386,7 @@ func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]s
 	copyIf("port", func() { dst.SSHPort = src.SSHPort })
 	copyIf("pass", func() { dst.SSHPassword = src.SSHPassword })
 	copyIf("identity-file", func() { dst.SSHKeyFile = src.SSHKeyFile })
+	copyIf("ssh-config", func() { dst.SSHConfigFile = src.SSHConfigFile })
 	copyIf("identity_file", func() { dst.SSHKeyFile = src.SSHKeyFile })
 	copyIf("known-hosts", func() { dst.KnownHostsFile = src.KnownHostsFile })
 	copyIf("insecure-host-key", func() { dst.InsecureHostKey = src.InsecureHostKey })
@@ -390,6 +395,8 @@ func applyCLIOverrides(cmd *cobra.Command, dst, src *config.Config, aliases *[]s
 	copyIf("auto-reconnect", func() { dst.AutoReconnect = src.AutoReconnect })
 	copyIf("reconnect-interval", func() { dst.ReconnectInterval = src.ReconnectInterval })
 	copyIf("keepalive-interval", func() { dst.KeepAliveInterval = src.KeepAliveInterval })
+	copyIf("health-check-target", func() { dst.HealthCheckTarget = src.HealthCheckTarget })
+	copyIf("health-check-timeout", func() { dst.HealthCheckTimeout = src.HealthCheckTimeout })
 	copyIf("http", func() { dst.ListenAddr = src.ListenAddr })
 	copyIf("listen", func() { dst.ListenAddr = src.ListenAddr })
 	copyIf("socks5", func() { dst.SocksAddr = src.SocksAddr })
@@ -432,10 +439,11 @@ func localizeCLI() {
 	})
 	usages := map[string]string{
 		"config":          i18n.T("Path to the YAML configuration file"),
+		"write-config":    i18n.T("Write a configuration template to a file, or - for stdout"),
 		"install-service": i18n.T("Install a service using auto, systemd, or openrc"), "remove-service": i18n.T("Remove a service using auto, systemd, or openrc"),
 		"service-name": i18n.T("Service name"), "service-user": i18n.T("Service user"), "service-group": i18n.T("Service group"),
 		"port": i18n.T("SSH server port"), "pass": i18n.T("SSH password (unsafe; interactive authentication is recommended)"),
-		"identity-file": i18n.T("Private key file"), "known-hosts": i18n.T("known_hosts file (default: ~/.ssh/known_hosts)"),
+		"identity-file": i18n.T("Private key file"), "ssh-config": i18n.T("OpenSSH client configuration file (default: ~/.ssh/config)"), "known-hosts": i18n.T("known_hosts file (default: ~/.ssh/known_hosts)"),
 		"insecure-host-key": i18n.T("Disable SSH host key verification (unsafe)"), "jump": i18n.T("Comma-separated SSH jump hosts (user@host:port)"),
 		"timeout": i18n.T("Connection timeout"), "listen": i18n.T("Local HTTP proxy address (deprecated; use --http)"),
 		"http": i18n.T("Local HTTP proxy address"), "socks5": i18n.T("SOCKS5 proxy address (for example :1080)"),
@@ -452,8 +460,8 @@ func localizeCLI() {
 	}
 	setFlagUsage(rootCmd, "help", i18n.T("help for ssh-tun"))
 	setFlagUsage(rootCmd, "version", i18n.T("version for ssh-tun"))
-	if flag := rootCmd.PersistentFlags().Lookup("write-config"); flag != nil {
-		flag.Usage = i18n.T("Write a configuration template to a file, or - for stdout")
+	if completion, _, err := rootCmd.Find([]string{"completion"}); err == nil && completion != rootCmd {
+		completion.Short = i18n.T("Generate shell completion script")
 	}
 	if flag := rootCmd.PersistentFlags().Lookup("service-force"); flag != nil {
 		flag.Usage = i18n.T("Overwrite an existing service definition")
@@ -461,6 +469,8 @@ func localizeCLI() {
 	setFlagUsage(rootCmd, "auto-reconnect", i18n.T("Reconnect automatically when the SSH channel is lost"))
 	setFlagUsage(rootCmd, "reconnect-interval", i18n.T("Delay between SSH reconnect attempts"))
 	setFlagUsage(rootCmd, "keepalive-interval", i18n.T("SSH channel health-check interval"))
+	setFlagUsage(rootCmd, "health-check-target", i18n.T("Remote TCP resource checked through SSH (for example google.com:443)"))
+	setFlagUsage(rootCmd, "health-check-timeout", i18n.T("Remote resource health-check timeout"))
 }
 
 func setFlagUsage(cmd *cobra.Command, name, usage string) {
@@ -472,26 +482,23 @@ func setFlagUsage(cmd *cobra.Command, name, usage string) {
 	}
 }
 
-// parseSSHTarget parses an SSH target in user@host format.
-func parseSSHTarget(target string) (string, string, error) {
-	if target == "" {
-		return "", "", nil
+func mergeResolvedSSHConfig(dst, requested, resolved *config.Config) {
+	dst.SSHServer, dst.SSHUser = resolved.SSHServer, resolved.SSHUser
+	if requested.SSHPort == "" || requested.SSHPort == "22" {
+		dst.SSHPort = resolved.SSHPort
 	}
-
-	at := strings.LastIndex(target, "@")
-	if at <= 0 || at == len(target)-1 || strings.Contains(target[:at], "@") {
-		return "", "", errors.New(i18n.T("invalid SSH target; expected user@host"))
+	if requested.SSHKeyFile == "" {
+		dst.SSHKeyFiles = resolved.SSHKeyFiles
 	}
-
-	user := target[:at]
-	host := target[at+1:]
-
-	// Validate parsed values.
-	if user == "" || host == "" {
-		return "", "", errors.New(i18n.T("user name and host must not be empty"))
+	if requested.KnownHostsFile == "" {
+		dst.KnownHostsFile = resolved.KnownHostsFile
 	}
-
-	return user, host, nil
+	if len(requested.JumpHosts) == 0 {
+		dst.JumpHosts = resolved.JumpHosts
+	}
+	if requested.Timeout == 10*time.Second {
+		dst.Timeout = resolved.Timeout
+	}
 }
 
 func addressWithDefaultPort(host, port string) (string, error) {

@@ -79,7 +79,7 @@ func TestLoadFileRejectsMultipleDocuments(t *testing.T) {
 
 func TestLoadFileReconnectSettings(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "ssh-tun.yaml")
-	content := "version: 1\nssh:\n  target: user@example.com\n  auto_reconnect: true\n  reconnect_interval: 7s\n  keepalive_interval: 9s\n"
+	content := "version: 1\nssh:\n  target: user@example.com\n  config_file: ~/.ssh/config\n  auto_reconnect: true\n  reconnect_interval: 7s\n  keepalive_interval: 9s\n  health_check_target: google.com:443\n  health_check_timeout: 3s\n"
 	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestLoadFileReconnectSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.AutoReconnect || cfg.ReconnectInterval != 7*time.Second || cfg.KeepAliveInterval != 9*time.Second {
+	if !cfg.AutoReconnect || cfg.ReconnectInterval != 7*time.Second || cfg.KeepAliveInterval != 9*time.Second || cfg.HealthCheckTarget != "google.com:443" || cfg.HealthCheckTimeout != 3*time.Second || cfg.SSHConfigFile != "~/.ssh/config" {
 		t.Fatalf("unexpected reconnect settings: %+v", cfg)
 	}
 }

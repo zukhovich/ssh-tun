@@ -77,6 +77,21 @@ func TestValidatePortAndTUNRoutes(t *testing.T) {
 	}
 }
 
+func TestValidateHealthCheckTarget(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SSHServer = "example.com:22"
+	cfg.SSHUser = "user"
+	cfg.HealthCheckTarget = "google.com"
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("health-check target without a port must be rejected")
+	}
+	cfg.HealthCheckTarget = "google.com:443"
+	cfg.HealthCheckTimeout = 0
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("zero health-check timeout must be rejected")
+	}
+}
+
 func TestValidateAllowsNonInteractiveAgentAuthentication(t *testing.T) {
 	cfg := NewConfig()
 	cfg.SSHServer = "example.com:22"

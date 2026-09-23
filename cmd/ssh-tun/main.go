@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Version = "1.0.4" // Set via ldflags at build time.
+	Version = "1.0.5" // Set via ldflags at build time.
 )
 
 func main() {

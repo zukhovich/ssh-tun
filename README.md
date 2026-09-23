@@ -2,7 +2,7 @@
 
 [Русская документация](README.ru.md)
 
-**Version 1.0.4**
+**Version 1.0.5**
 
 `ssh-tun` is a self-contained command-line network proxy for Linux and Windows. It carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH and supports jump hosts, routing rules, subnet mapping, automatic reconnection, native service installation, and OS-aware configuration templates.
 
@@ -26,7 +26,7 @@ Repository: <https://github.com/zukhovich/ssh-tun>
 
 ## Installation
 
-Install version 1.0.4 from GitHub Releases:
+Install version 1.0.5 from GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -36,7 +36,7 @@ Install into a custom directory:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.4 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.5 --install-dir "$HOME/bin"
 ```
 
 ## Build From Source
@@ -64,6 +64,13 @@ Connect directly; on first use, verify the displayed host-key fingerprint and an
 
 ```sh
 ssh-tun user@example.com --http 127.0.0.1:8080 --socks5 127.0.0.1:1080
+```
+
+OpenSSH client aliases from `~/.ssh/config` are supported, including `HostName`, `User`, `Port`, `IdentityFile`, `UserKnownHostsFile`, `ProxyJump`, and `ConnectTimeout`:
+
+```sh
+ssh-tun production --http 127.0.0.1:8080
+ssh-tun -F ./ssh_config production
 ```
 
 Use a specific private key with `-i`/`--identity-file`:
@@ -121,7 +128,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode requires an elevated Administrator console. Version 1.0.4 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
+Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode requires an elevated Administrator console. Version 1.0.5 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
 
 ## Language
 
@@ -143,7 +150,14 @@ ssh-tun user@example.com --auto-reconnect \
   --keepalive-interval 15s --reconnect-interval 5s
 ```
 
-The same settings are available as `ssh.auto_reconnect`, `ssh.keepalive_interval`, and `ssh.reconnect_interval` in YAML.
+The same settings are available as `ssh.auto_reconnect`, `ssh.keepalive_interval`, and `ssh.reconnect_interval` in YAML. To additionally verify end-to-end forwarding through SSH, configure a remote TCP resource:
+
+```sh
+ssh-tun production --auto-reconnect \
+  --health-check-target google.com:443 --health-check-timeout 5s
+```
+
+The YAML equivalents are `ssh.health_check_target` and `ssh.health_check_timeout`.
 
 ## systemd, OpenRC, and Windows services
 
@@ -163,6 +177,18 @@ ssh-tun --config /path/to/config.yaml --remove-service auto
 ```
 
 On Linux, `auto` selects systemd or OpenRC. On Windows it creates/removes a Windows Service through `sc.exe`; run the console as Administrator. Linux service operations require root. A service must use non-interactive SSH authentication. GNOME `--sys-proxy` is intended for an interactive desktop session and normally should be disabled in a service.
+
+## Shell completion
+
+Generate completion for Bash, Zsh, Fish, or PowerShell:
+
+```sh
+ssh-tun completion bash > ~/.local/share/bash-completion/completions/ssh-tun
+ssh-tun completion zsh > ~/.zsh/completions/_ssh-tun
+ssh-tun completion fish > ~/.config/fish/completions/ssh-tun.fish
+```
+
+The installer configures completion automatically unless `--no-completions` is specified. Completion includes options, supported option values, relevant files, and literal host aliases from the SSH client configuration.
 
 ## Security
 

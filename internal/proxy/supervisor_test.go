@@ -109,6 +109,20 @@ func TestSupervisorWithoutReconnect(t *testing.T) {
 	}
 }
 
+func TestRemoteResourceHealthCheck(t *testing.T) {
+	keyPath, addr := startTestSSHServer(t)
+	cfg := newTestConfig(t, addr, keyPath, false)
+	supervisor, err := NewSupervisor(cfg, logger.NewLogger(false))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer supervisor.Close()
+	client := supervisor.SSH()
+	if client.checkRemoteResource("127.0.0.1:1", 100*time.Millisecond) {
+		t.Fatal("an unreachable remote resource must fail the health check")
+	}
+}
+
 func TestWaitDisconnectedDetectsClosedChannel(t *testing.T) {
 	keyPath, addr := startTestSSHServer(t)
 	cfg := newTestConfig(t, addr, keyPath, false)
@@ -122,7 +136,7 @@ func TestWaitDisconnectedDetectsClosedChannel(t *testing.T) {
 	}
 	stop := make(chan struct{})
 	healthyDone := make(chan bool, 1)
-	go func() { healthyDone <- waitDisconnected(client, 20*time.Millisecond, stop) }()
+	go func() { healthyDone <- waitDisconnected(client, 20*time.Millisecond, "", time.Second, stop) }()
 	time.Sleep(60 * time.Millisecond)
 	close(stop)
 	if <-healthyDone {

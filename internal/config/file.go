@@ -15,18 +15,21 @@ type File struct {
 	Version        int    `yaml:"version"`
 	LegacyLanguage string `yaml:"language"` // Deprecated: accepted for v1 compatibility, ignored.
 	SSH            struct {
-		Target            string   `yaml:"target"`
-		Port              string   `yaml:"port"`
-		Password          string   `yaml:"password"`
-		IdentityFile      string   `yaml:"identity_file"`
-		KnownHosts        string   `yaml:"known_hosts"`
-		InsecureHostKey   bool     `yaml:"insecure_host_key"`
-		InteractiveAuth   *bool    `yaml:"interactive_auth"`
-		JumpHosts         []string `yaml:"jump_hosts"`
-		Timeout           string   `yaml:"timeout"`
-		AutoReconnect     *bool    `yaml:"auto_reconnect"`
-		ReconnectInterval string   `yaml:"reconnect_interval"`
-		KeepAliveInterval string   `yaml:"keepalive_interval"`
+		Target             string   `yaml:"target"`
+		Port               string   `yaml:"port"`
+		Password           string   `yaml:"password"`
+		IdentityFile       string   `yaml:"identity_file"`
+		ConfigFile         string   `yaml:"config_file"`
+		KnownHosts         string   `yaml:"known_hosts"`
+		InsecureHostKey    bool     `yaml:"insecure_host_key"`
+		InteractiveAuth    *bool    `yaml:"interactive_auth"`
+		JumpHosts          []string `yaml:"jump_hosts"`
+		Timeout            string   `yaml:"timeout"`
+		AutoReconnect      *bool    `yaml:"auto_reconnect"`
+		ReconnectInterval  string   `yaml:"reconnect_interval"`
+		KeepAliveInterval  string   `yaml:"keepalive_interval"`
+		HealthCheckTarget  string   `yaml:"health_check_target"`
+		HealthCheckTimeout string   `yaml:"health_check_timeout"`
 	} `yaml:"ssh"`
 	Proxy struct {
 		HTTP         string `yaml:"http"`
@@ -84,7 +87,7 @@ func LoadFile(path string) (*Config, []string, error) {
 	if file.SSH.Port != "" {
 		cfg.SSHPort = file.SSH.Port
 	}
-	cfg.SSHPassword, cfg.SSHKeyFile, cfg.KnownHostsFile = file.SSH.Password, file.SSH.IdentityFile, file.SSH.KnownHosts
+	cfg.SSHPassword, cfg.SSHKeyFile, cfg.SSHConfigFile, cfg.KnownHostsFile = file.SSH.Password, file.SSH.IdentityFile, file.SSH.ConfigFile, file.SSH.KnownHosts
 	cfg.InsecureHostKey, cfg.JumpHosts = file.SSH.InsecureHostKey, file.SSH.JumpHosts
 	if file.SSH.InteractiveAuth != nil {
 		cfg.InteractiveAuth = *file.SSH.InteractiveAuth
@@ -108,6 +111,13 @@ func LoadFile(path string) (*Config, []string, error) {
 		cfg.KeepAliveInterval, err = time.ParseDuration(file.SSH.KeepAliveInterval)
 		if err != nil {
 			return nil, nil, fmt.Errorf(i18n.T("invalid ssh.keepalive_interval: %w"), err)
+		}
+	}
+	cfg.HealthCheckTarget = file.SSH.HealthCheckTarget
+	if file.SSH.HealthCheckTimeout != "" {
+		cfg.HealthCheckTimeout, err = time.ParseDuration(file.SSH.HealthCheckTimeout)
+		if err != nil {
+			return nil, nil, fmt.Errorf(i18n.T("invalid ssh.health_check_timeout: %w"), err)
 		}
 	}
 	if file.Proxy.HTTP != "" {
@@ -160,6 +170,7 @@ ssh:
   port: "22"
   password: ""
   identity_file: '%s'
+  config_file: ''
   known_hosts: '%s'
   insecure_host_key: false
   interactive_auth: true
@@ -168,6 +179,8 @@ ssh:
   auto_reconnect: false
   reconnect_interval: 5s
   keepalive_interval: 15s
+  health_check_target: '' # for example: google.com:443
+  health_check_timeout: 5s
 
 proxy:
   http: ":8080"

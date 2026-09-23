@@ -18,66 +18,72 @@ type SubnetAlias struct {
 
 // Config stores the resolved application configuration.
 type Config struct {
-	ListenAddr        string
-	SSHServer         string
-	SSHUser           string
-	SSHPassword       string
-	SSHKeyFile        string
-	KnownHostsFile    string
-	InsecureHostKey   bool
-	HTTPUpstream      string
-	SSHPort           string
-	SocksAddr         string
-	TunMode           bool
-	TunCIDR           string
-	TunRoute          []string
-	TunGlobal         bool
-	SubnetAliases     []SubnetAlias
-	JumpHosts         []string
-	Timeout           time.Duration
-	AutoReconnect     bool
-	ReconnectInterval time.Duration
-	KeepAliveInterval time.Duration
-	Verbose           bool
-	LogFile           string
-	InteractiveAuth   bool
-	SystemProxy       bool
-	RuleFile          string
-	ServiceManager    string
-	ServiceName       string
-	ServiceUser       string
-	ServiceGroup      string
-	ServiceEnable     bool
-	ServiceStart      bool
+	ListenAddr         string
+	SSHServer          string
+	SSHUser            string
+	SSHPassword        string
+	SSHKeyFile         string
+	SSHKeyFiles        []string
+	SSHConfigFile      string
+	KnownHostsFile     string
+	InsecureHostKey    bool
+	HTTPUpstream       string
+	SSHPort            string
+	SocksAddr          string
+	TunMode            bool
+	TunCIDR            string
+	TunRoute           []string
+	TunGlobal          bool
+	SubnetAliases      []SubnetAlias
+	JumpHosts          []string
+	Timeout            time.Duration
+	AutoReconnect      bool
+	ReconnectInterval  time.Duration
+	KeepAliveInterval  time.Duration
+	HealthCheckTarget  string
+	HealthCheckTimeout time.Duration
+	Verbose            bool
+	LogFile            string
+	InteractiveAuth    bool
+	SystemProxy        bool
+	RuleFile           string
+	ServiceManager     string
+	ServiceName        string
+	ServiceUser        string
+	ServiceGroup       string
+	ServiceEnable      bool
+	ServiceStart       bool
 }
 
 // NewConfig returns the default configuration.
 func NewConfig() *Config {
 	return &Config{
-		ListenAddr:        ":8080",
-		SSHServer:         "",
-		SSHPort:           "22",
-		JumpHosts:         []string{},
-		Timeout:           10 * time.Second,
-		AutoReconnect:     false,
-		ReconnectInterval: 5 * time.Second,
-		KeepAliveInterval: 15 * time.Second,
-		Verbose:           false,
-		InteractiveAuth:   true,
-		SystemProxy:       false,
-		RuleFile:          "",
-		SocksAddr:         "",
-		TunMode:           false,
-		TunCIDR:           "10.0.0.1/24",
-		TunRoute:          []string{},
-		TunGlobal:         false,
-		SubnetAliases:     []SubnetAlias{},
-		ServiceManager:    "auto",
-		ServiceName:       "ssh-tun",
-		ServiceUser:       "root",
-		ServiceGroup:      "root",
-		ServiceEnable:     true,
-		ServiceStart:      true,
+		ListenAddr:         ":8080",
+		SSHServer:          "",
+		SSHPort:            "22",
+		JumpHosts:          []string{},
+		Timeout:            10 * time.Second,
+		AutoReconnect:      false,
+		ReconnectInterval:  5 * time.Second,
+		KeepAliveInterval:  15 * time.Second,
+		HealthCheckTarget:  "",
+		HealthCheckTimeout: 5 * time.Second,
+		Verbose:            false,
+		InteractiveAuth:    true,
+		SystemProxy:        false,
+		RuleFile:           "",
+		SocksAddr:          "",
+		TunMode:            false,
+		TunCIDR:            "10.0.0.1/24",
+		TunRoute:           []string{},
+		TunGlobal:          false,
+		SubnetAliases:      []SubnetAlias{},
+		ServiceManager:     "auto",
+		ServiceName:        "ssh-tun",
+		ServiceUser:        "root",
+		ServiceGroup:       "root",
+		ServiceEnable:      true,
+		ServiceStart:       true,
 	}
 }
 
@@ -147,6 +153,14 @@ func (c *Config) Validate() error {
 	if c.KeepAliveInterval <= 0 {
 		return errors.New(i18n.T("keepalive interval must be greater than zero"))
 	}
+	if c.HealthCheckTimeout <= 0 {
+		return errors.New(i18n.T("health-check timeout must be greater than zero"))
+	}
+	if c.HealthCheckTarget != "" {
+		if _, _, err := net.SplitHostPort(c.HealthCheckTarget); err != nil {
+			return fmt.Errorf(i18n.T("invalid health-check target: %w"), err)
+		}
+	}
 	if _, _, err := net.SplitHostPort(c.ListenAddr); err != nil {
 		return fmt.Errorf(i18n.T("invalid HTTP proxy address: %w"), err)
 	}
@@ -177,12 +191,8 @@ func (c *Config) Validate() error {
 	}
 
 	for _, jumpHost := range c.JumpHosts {
-		if jumpHost == "" {
-			continue
-		}
-		_, _, _, err := parseJumpHost(jumpHost)
-		if err != nil {
-			return fmt.Errorf(i18n.T("invalid SSH jump host: %w"), err)
+		if strings.TrimSpace(jumpHost) == "" {
+			return errors.New(i18n.T("SSH jump host must not be empty"))
 		}
 	}
 

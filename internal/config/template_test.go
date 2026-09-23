@@ -10,7 +10,7 @@ import (
 
 func TestTemplateForLinux(t *testing.T) {
 	template := Template("linux")
-	for _, want := range []string{"identity_file: '~/.ssh/id_ed25519'", "user: root", "group: root", "auto_reconnect: false"} {
+	for _, want := range []string{"identity_file: '~/.ssh/id_ed25519'", "config_file: ''", "user: root", "group: root", "auto_reconnect: false", "health_check_target: ''"} {
 		if !strings.Contains(template, want) {
 			t.Errorf("linux template missing %q", want)
 		}
@@ -22,7 +22,7 @@ func TestTemplateForLinux(t *testing.T) {
 
 func TestTemplateForWindows(t *testing.T) {
 	template := Template("windows")
-	for _, want := range []string{"user: SYSTEM", "group: SYSTEM", "identity_file: '${USERPROFILE}", "auto_reconnect: false"} {
+	for _, want := range []string{"user: SYSTEM", "group: SYSTEM", "identity_file: '${USERPROFILE}", "config_file: ''", "auto_reconnect: false", "health_check_target: ''"} {
 		if !strings.Contains(template, want) {
 			t.Errorf("windows template missing %q", want)
 		}

@@ -67,7 +67,7 @@ func (s *Supervisor) monitor() {
 		if client == nil {
 			return
 		}
-		if !waitDisconnected(client, s.cfg.KeepAliveInterval, s.stop) {
+		if !waitDisconnected(client, s.cfg.KeepAliveInterval, s.cfg.HealthCheckTarget, s.cfg.HealthCheckTimeout, s.stop) {
 			return
 		}
 		s.log.Warnf(i18n.T("SSH connection lost; reconnecting every %s..."), s.cfg.ReconnectInterval)
@@ -93,11 +93,15 @@ func (s *Supervisor) monitor() {
 }
 
 // waitDisconnected polls the SSH channel until it fails or shutdown starts.
-func waitDisconnected(client *SSHClient, interval time.Duration, stop <-chan struct{}) bool {
+func waitDisconnected(client *SSHClient, interval time.Duration, healthTarget string, healthTimeout time.Duration, stop <-chan struct{}) bool {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
-		if !client.keepAlive(minDuration(interval, 5*time.Second)) {
+		healthy := client.keepAlive(minDuration(interval, 5*time.Second))
+		if healthy && healthTarget != "" {
+			healthy = client.checkRemoteResource(healthTarget, healthTimeout)
+		}
+		if !healthy {
 			return true
 		}
 		select {
