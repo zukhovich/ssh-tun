@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.0.4
 
 - Removed automatic TUN privilege relaunch; TUN now fails clearly when the current process lacks the required privileges.
 - Switched CLI localization to Lokit-managed gettext catalogs, removed --lang selection, and embedded generated PO files in release binaries.

@@ -2,7 +2,7 @@
 
 [Русская документация](README.ru.md)
 
-**Version 1.0.3**
+**Version 1.0.4**
 
 `ssh-tun` is a self-contained command-line network proxy for Linux and Windows. It carries HTTP, HTTPS CONNECT, SOCKS5, and TUN traffic through SSH and supports jump hosts, routing rules, subnet mapping, automatic reconnection, native service installation, and OS-aware configuration templates.
 
@@ -26,7 +26,7 @@ Repository: <https://github.com/zukhovich/ssh-tun>
 
 ## Installation
 
-Install version 1.0.3 from GitHub Releases:
+Install version 1.0.4 from GitHub Releases:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh | sh
@@ -36,7 +36,7 @@ Install into a custom directory:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/zukhovich/ssh-tun/main/scripts/install.sh |
-  sh -s -- --version 1.0.3 --install-dir "$HOME/bin"
+  sh -s -- --version 1.0.4 --install-dir "$HOME/bin"
 ```
 
 ## Build From Source
@@ -121,7 +121,7 @@ sudo ssh-tun user@example.com --tun-route 10.20.0.0/16
 sudo ssh-tun user@example.com --tun-global
 ```
 
-Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode requires an elevated Administrator console. Version 1.0.3 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
+Linux TUN mode requires root privileges and `iproute2`; Windows TUN mode requires an elevated Administrator console. Version 1.0.4 forwards IPv4 TCP and DNS traffic; general UDP forwarding is not implemented.
 
 ## Language
 

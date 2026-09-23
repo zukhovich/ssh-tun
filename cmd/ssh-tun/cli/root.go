@@ -25,7 +25,7 @@ import (
 )
 
 var (
-	Version        = "1.0.3"
+	Version        = "1.0.4"
 	cfg            = config.NewConfig()
 	aliasFlags     []string
 	configPath     string

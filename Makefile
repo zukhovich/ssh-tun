@@ -1,5 +1,5 @@
 BINARY_NAME := ssh-tun
-VERSION := 1.0.3
+VERSION := 1.0.4
 BUILD_DIR := ./build
 LDFLAGS := -trimpath -ldflags "-X main.Version=$(VERSION) -s -w"
 LINUX_LDFLAGS := $(LDFLAGS) -ldflags "-X main.Version=$(VERSION) -s -w -extldflags=-static"
